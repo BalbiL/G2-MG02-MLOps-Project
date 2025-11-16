@@ -1,0 +1,17 @@
+This is the first version of the frontend (only the news table is available for now in supabase)
+
+To locally start the streamlit interface on a linux machine from the terminal, you need to:
+
+1-Navigate to the frontend folder (where this file is)
+
+2-If its the first time ever hosting the streamlit locally, create a python virtual environment with: python3 -m venv <venv_name>
+
+3-Activate the venv with: source <venv_name>/bin/activate
+
+4-If its the first time ever hosting the streamlit locally, install the dependencies with: pip install streamlit
+
+5-Run the app with: streamlit run app.py
+
+The streamlit should be running on port 8501 of localhost.
+
+You can host the API and the interface on the same machine and interact with the API on the main page (with the GET news call)
