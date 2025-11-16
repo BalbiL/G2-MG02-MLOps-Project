@@ -6,7 +6,7 @@ user_topics (user_id, topics_list)
 
 # News and interactions
 news (news_id, category, subcategory, title, abstract)
-interactions_static (a more cleaned version of behaviors data of MIND dataset / should only be used for training purposes)
+interactions_static (same columns as interactions table) (a more cleaned version of behaviors data of MIND dataset / should only be used for training purposes)
 interactions (user_id, news_id, event_type, event_time) (the future interactions will be stored here)
 
 # Recommendations
