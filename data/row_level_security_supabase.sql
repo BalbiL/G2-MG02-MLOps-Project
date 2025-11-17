@@ -1,3 +1,6 @@
+-- RLS used for supabase --
+-- Already in the section "SQL Editor" in Supabase --
+
 alter table user_topics enable row level security;
 alter table default_recs enable row level security;
 alter table personalized_recs enable row level security;
