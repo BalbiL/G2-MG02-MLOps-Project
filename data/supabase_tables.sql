@@ -8,6 +8,16 @@ create table if not exists user_topics (
     primary key (user_id)
 );
 
+-- Interactions --
+
+create table if not exists interactions (
+    interaction_id uuid primary key default gen_random_uuid(),
+    user_id uuid references auth.users(id),
+    news_id text references news(id),
+    event_type text,
+    event_time timestamptz default now()
+);
+
 -- Recommandations --
 
 create table if not exists default_recs (
