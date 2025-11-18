@@ -1,0 +1,14 @@
+Data side
+- Advanced filtering (maybe eliminate items with least k clicks / views) (be careful to cold start)
+
+ML side
+- Integrate abstract and timestamp (maybe bucketing) features in the retrieval / ranking stage
+- Integrate mixed negative sampling at the retrieval / ranking stage
+- Compute more metrics (recall@k, mmr)
+- Try more efficient models on text features (bilstm, attention mechanism, etc.)
+
+Ops side
+- Create inference script (for api calls)
+
+
+Maybe integrate a score on the front-end side
