@@ -10,7 +10,7 @@ To locally start the API on a linux machine from the terminal, you need to:
 
 4-If its the first time ever hosting the API locally, install the dependencies with: pip install fastapi uvicorn supabase
 
-5-Run the app with: uvicorn app:app --reload (--reload flag allows to update if changes are made)
+5-Run the app with: uvicorn main:app --reload (--reload flag allows to update if changes are made)
 
 The API should be running on port 8000 of localhost.
 
