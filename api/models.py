@@ -13,7 +13,7 @@ class News(BaseModel):
 
 
 class Recommendation(BaseModel):
-    news_id: str
+    news_ids: List[str]
     score: float
     generation_time: Optional[datetime] = None
 

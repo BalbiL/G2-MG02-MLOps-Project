@@ -1,9 +1,53 @@
 import streamlit as st
 import requests
 
-user_ids=["1","2","3","4"]
+api_base_url = "http://localhost:8000"
 
+# -----------------------------
+# Fetch authenticated users
+# -----------------------------
+def fetch_users():
+    try:
+        response = requests.get(f"{api_base_url}/auth_users")
+        response.raise_for_status()
+        users = response.json()
+
+        # Convert to dict for fast lookup: email → user_id
+        return {u["email"]: u["id"] for u in users}
+
+    except Exception as e:
+        st.error(f"Failed to fetch users: {e}")
+        return {}
+
+# Cache the user list for performance
+@st.cache_data(ttl=300)
+def get_cached_users():
+    return fetch_users()
+
+users = get_cached_users()  # {email: user_id}
+
+
+# -----------------------------
+# Fetch user topics
+# -----------------------------
+def fetch_user_topics(user_id: str):
+    try:
+        response = requests.get(f"{api_base_url}/user_topics/{user_id}")
+        if response.status_code == 200:
+            return response.json()   # Row exists → has topics
+        elif response.status_code == 500:
+            return None  # No topics row for this user
+        else:
+            st.error(f"Unexpected error checking user topics: {response.text}")
+            return None
+    except Exception as e:
+        st.error(f"Failed to fetch user topics: {e}")
+        return None
+
+
+# -----------------------------
 # Page config
+# -----------------------------
 st.set_page_config(
     page_title="News Recommender",
     page_icon="📰",
@@ -13,59 +57,46 @@ st.set_page_config(
 with st.container(horizontal_alignment="center"):
     st.image("images/logo.png", width=300)
 
-
-with st.container(horizontal_alignment="center",border=True):
-    
-    st.title("Session based news recommander")
-    with st.container(horizontal_alignment="center",gap="small"):
-        st.text("Enter your user ID")
-        user_id = st.text_input("",placeholder="U123456",width=300)
+with st.container(horizontal_alignment="center", border=True):
+    st.title("Session based news recommender")
+    with st.container(horizontal_alignment="center", gap="small"):
+        st.text("Enter your email to log in")
+        email_input = st.text_input(
+            "Email",
+            placeholder="example@domain.com",
+            width=300,
+            label_visibility="collapsed"
+        )
 
         if st.button("Continue"):
-            if user_id in user_ids:
-                st.success("User found! Redirecting to recommendations...")
+
+            # FIRST: Check if email exists in Supabase Auth
+            if email_input in users:
+                user_id = users[email_input]
+
+                # Store ID and email
                 st.session_state["user_id"] = user_id
-                st.switch_page("pages/recommendations.py")
+                st.session_state["email"] = email_input
+
+                # SECOND: Check if topics exist for this user
+                topics_response = fetch_user_topics(user_id)
+
+                if topics_response:  
+                    # Topics found → go to recommendations
+                    st.success("Welcome back! Loading your recommendations...")
+                    st.switch_page("pages/recommendations.py")
+
+                else:
+                    # No topics → send user to onboarding
+                    st.info("We need your preferred topics to personalize your feed.")
+                    st.switch_page("pages/onboarding.py")
+
             else:
-                st.warning("User not found. Let's customize your news preferences.")    
-                st.session_state["user_id"] = user_id
-                st.switch_page("pages/onboarding.py")
+                # Email does not exist in Supabase Auth
+                st.warning("Email not found. Get a project admin to invite you by email.")
 
-st.header("Temporary test for local hosted API")
-# User input
-news_id = st.text_input("Enter News ID:", placeholder="e.g. N123456")
+                
 
-# When button is clicked
-if st.button("Get News"):
-    if not news_id:
-        st.warning("Please enter a News ID before searching.")
-    else:
-        try:
-            # Call FastAPI GET endpoint
-            url = f"http://localhost:8000/news/{news_id}"
-            response = requests.get(url)
-
-            if response.status_code == 200:
-                news = response.json()
-                st.success("News found!")
-                st.json(news)  # pretty JSON display
-
-                # Optional: formatted UI display
-                with st.container(border=True):
-                    st.subheader(news["title"])
-                    st.caption(f"📚 {news['category']} → {news['subcategory']}")
-                    st.write(news["abstract"])
-                    st.write(f"🕒 Published at: {news['inserted_at']}")
-            
-            elif response.status_code == 404:
-                st.error("❌ News not found.")
-            else:
-                st.error(f"⚠ Unexpected error: {response.status_code}")
-        
-        except requests.exceptions.ConnectionError:
-            st.error("🚫 Could not connect to the API. Is FastAPI running?")
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
 
 
 # User journey
