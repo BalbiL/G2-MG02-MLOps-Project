@@ -19,12 +19,7 @@ def fetch_users():
         st.error(f"Failed to fetch users: {e}")
         return {}
 
-# Cache the user list for performance
-@st.cache_data(ttl=300)
-def get_cached_users():
-    return fetch_users()
 
-users = get_cached_users()  # {email: user_id}
 
 
 # -----------------------------
@@ -44,7 +39,6 @@ def fetch_user_topics(user_id: str):
         st.error(f"Failed to fetch user topics: {e}")
         return None
 
-
 # -----------------------------
 # Page config
 # -----------------------------
@@ -53,14 +47,37 @@ st.set_page_config(
     page_icon="📰",
     layout="centered"
 )
+# logo
+st.logo("frontend/images/logo.png")
 
-with st.container(horizontal_alignment="center"):
-    st.image("images/logo.png", width=300)
+# Fetch the users from supabase through api
+users=fetch_users()  
 
-with st.container(horizontal_alignment="center", border=True):
-    st.title("Session based news recommender")
+with st.container(horizontal_alignment="center",vertical_alignment="center", border=True,height=700):
+    
+    # big logo and title
+    with st.container(horizontal_alignment="center",gap="small"):
+        st.image("frontend/images/logo.png", width=300)
+
+        st.markdown(
+        """
+        <h2 style="
+            text-align:center;
+            color: rgb(225,61,50);
+            font-weight:700;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            margin-top:20px;
+        ">
+            Session Based News Recommender
+        </h2>
+        """,
+        unsafe_allow_html=True
+    )
+    # -----------------------------
+    # Login container
+    # -----------------------------
     with st.container(horizontal_alignment="center", gap="small"):
-        st.text("Enter your email to log in")
+
         email_input = st.text_input(
             "Email",
             placeholder="example@domain.com",
@@ -68,7 +85,10 @@ with st.container(horizontal_alignment="center", border=True):
             label_visibility="collapsed"
         )
 
-        if st.button("Continue"):
+        # -------------------------
+        # LOGIN BUTTON
+        # -------------------------
+        if st.button("Log in"):
 
             # FIRST: Check if email exists in Supabase Auth
             if email_input in users:
@@ -77,41 +97,53 @@ with st.container(horizontal_alignment="center", border=True):
                 # Store ID and email
                 st.session_state["user_id"] = user_id
                 st.session_state["email"] = email_input
-
+                
                 # SECOND: Check if topics exist for this user
                 topics_response = fetch_user_topics(user_id)
 
                 if topics_response:  
-                    # Topics found → go to recommendations
                     st.success("Welcome back! Loading your recommendations...")
                     st.switch_page("pages/recommendations.py")
-
                 else:
-                    # No topics → send user to onboarding
                     st.info("We need your preferred topics to personalize your feed.")
                     st.switch_page("pages/onboarding.py")
 
             else:
-                # Email does not exist in Supabase Auth
-                st.warning("Email not found. Get a project admin to invite you by email.")
-
+            # ---------------------------------------------------------
+            # Send user invite through email
+            # ---------------------------------------------------------
+                # st.warning(f"Email not found. Sending an invitation email to {email_input}")
+                st.toast("Invitation sent!", icon="📧")
+                try:
+                    invite_payload = {"email": email_input}
+                
+                    response = requests.post(
+                                    f"{api_base_url}/auth_users/invite",
+                                    json=invite_payload,
+                                    timeout=10
+                                )
+                    response.raise_for_status()
+                    
+                except requests.exceptions.HTTPError as e:
+                                st.error(f"There was an error with you login. Api returned code: {response.status_code},\n with details {response.json().get('detail')}")
+                except Exception as e:
+                                st.error(f"Failed to send invitation: {e}")
                 
 
+        # -------------------------
+        # LOGOUT BUTTON
+        # -------------------------
+        if st.button("Log out"):
+            st.session_state.clear()
+            st.success("Successfully logged out...")
+            st.rerun()
 
+        # -------------------------
+        # STATUS MESSAGE
+        # -------------------------
 
-# User journey
-
-# 1. Home page (User ID must be entered)
-
-# 2. (Conditional). If User ID is in db, go from 1 to 3
-#                   Otherwise, insert User ID into db and display the page for selecting topics of interest.
-# The goal of this page is to propose topics to the user depending on those in the MIND dataset (sport, etc.)
-
-# 3. Recommendations page.
-#     => Not personalized / First recommendations (5 "news" items  + 15 items based on their choices on the second page).
-#     => Personalized (algorithm applied to latest impressions + storage of recommendations).
-
-
-# Note : A recommendation can be materialized by a kind of card with a title and when clicked, the abstract appears.
-# The card should use the pydantic model returned by the API
-# Icons, categories, etc.
+        if "email" in st.session_state:
+            st.info(f"Currently logged in as: **{st.session_state['email']}**")
+        else:
+            st.info("Currently not logged in.")   
+        

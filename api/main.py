@@ -5,17 +5,40 @@ from datetime import datetime,timezone
 from postgrest.exceptions import APIError
 import traceback
 
+# -----------------------------
+# This file contains ALL routes for the FASTAPI api. 
+# -----------------------------
 app = FastAPI()
 
 
 #-------------------------------------------- Routes for the news table-----------------------------------------------------
 
+@app.get("/news/by_category", response_model=list[News])
+def get_news_by_category(categories: List[str] = Query(..., description="List of categories")):
+    """
+    Fetch all news items that belong to any of the provided categories.
+    Example: /news/by_category?categories=sport&categories=music
+    """
+
+    response = (
+        supabase.table("news")
+        .select("*")
+        .in_("category", categories)
+        .execute()
+    )
+
+    if response.data is None or len(response.data) == 0:
+        raise HTTPException(status_code=404, detail="No news found for these categories")
+
+    return response.data
+
+
 @app.get("/news/{news_id}", response_model=News)
 def get_news(news_id: str)->str:
-    '''
+    """
     This GET route allows you to fetch a specific news in the "news" table using its id.
 
-    '''
+    """
     response = supabase.table("news").select("*").eq("id", news_id).execute()
 
     if not response.data:
@@ -26,23 +49,29 @@ def get_news(news_id: str)->str:
 
 
 @app.get("/news", response_model=list[News])
-def get_latest_news(limit: int = Query(10, gt=0)):
-    '''
-    This GET route allows you to fetch the last "limit" news by descneding Ids.
+def get_latest_news(
+    limit: int = Query(1000, gt=0),
+    offset: int = Query(0, ge=0)
+):
+    """
+    This GET route allows you to fetch a specific news by batch using a limit and offset.
 
-    '''
+    """
     response = (
         supabase.table("news")
         .select("*")
-        .order("id", desc=True)   # Sort by ID descending
-        .limit(limit)
+        .order("id", desc=True)
+        .range(offset, offset + limit - 1)
         .execute()
     )
 
-    if response.data is None or len(response.data) == 0:
+    if not response.data:
         raise HTTPException(status_code=404, detail="No news found")
 
     return response.data
+
+
+
 
 #-------------------------------------------- Routes for the general reccomandation table-----------------------------------------------------
 
@@ -208,17 +237,16 @@ def get_user_topics(user_id: UUID = Path(..., description="The UUID of the user"
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
+# ---------------------------------------------Routes for auth users--------------------------------------
 
 @app.get("/auth_users")
 def get_authenticated_users():
     """
-    Fetch all authenticated Supabase users using the Admin API.
-    Includes detailed error output.
+    Fetch all authenticated Supabase users 
     """
 
     try:
-        users = admin.list_users()  # This returns a list, NOT a dict
+        users = admin.list_users()  
 
     except APIError as e:
         raise HTTPException(
@@ -241,7 +269,7 @@ def get_authenticated_users():
             },
         )
 
-    # users is already a LIST of user objects
+    
     return [
         {
             "id": user.id,
@@ -252,6 +280,44 @@ def get_authenticated_users():
         }
         for user in users
     ]
+
+
+
+@app.post("/auth_users/invite")
+def invite_user(request: InviteRequest):
+    """
+    Send an authentication invite email 
+    """
+
+    try:
+        # Send invitation
+        result = admin.invite_user_by_email(request.email)
+
+        return {
+            "status": "success",
+            "message": f"Invitation sent to {request.email}",
+            "response": str(result)
+        }
+
+    except APIError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "type": "Supabase APIError",
+                "message": str(e),
+                "traceback": traceback.format_exc(),
+            },
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "type": type(e).__name__,
+                "message": str(e),
+                "traceback": traceback.format_exc()
+            },
+        )
 #-------------------------------------------- Routes for the personalized recommandations table-----------------------------------------------------
 @app.post("/personalized_recommendations/{user_id}", status_code=201)
 def create_personalized_recommendation(user_id: str, rec: Recommendation):
@@ -300,7 +366,7 @@ def delete_personalized_recommendation(
             supabase
             .table("personalized_recs")
             .delete()
-            .eq("user_id", str(user_id))  # convert UUID -> string for Supabase
+            .eq("user_id", str(user_id))  
             .eq("news_id", news_id)
             .execute()
         )
@@ -332,7 +398,7 @@ def get_personalized_recommendations(user_id: UUID):
             supabase
             .table("personalized_recs")
             .select("*")
-            .eq("user_id", str(user_id))   # convert UUID → string
+            .eq("user_id", str(user_id))   
             .order("generation_time", desc=True)
             .execute()
         )
@@ -349,6 +415,84 @@ def get_personalized_recommendations(user_id: UUID):
 
 
 
+# --------------------------------------------------Routes for interactions-----------------------------------
+
+@app.post("/interactions", status_code=201)
+def create_interaction(interaction: Interaction):
+    """
+    Insert a new interaction into the 'interactions' table.
+    """
+    # Set the event_time to now if not provided
+    event_time = datetime.now(timezone.utc)
+
+    data = {
+        "user_id": str(interaction.user_id),  
+        "news_id": interaction.news_id,
+        "event_type": interaction.event_type,
+        "event_time": event_time.isoformat()
+    }
+
+    try:
+        response = supabase.table("interactions").insert(data).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if not response.data or len(response.data) == 0:
+        raise HTTPException(status_code=500, detail="Insert failed, no Supabase return data")
+
+    return {
+        "message": "Interaction created successfully",
+        "interaction": response.data
+    }
 
 
-# The return of the API call should be converted to a Pydantic model before going to streamlit
+
+@app.get("/interactions/{user_id}")
+def get_user_interactions(user_id: UUID):
+    """
+    Fetch all interactions for a given user from the 'interactions' table.
+    """
+    try:
+        response = (
+            supabase
+            .table("interactions")
+            .select("*")
+            .eq("user_id", str(user_id))  
+            .order("event_time", desc=True)
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # response.data is always a list, possibly empty
+    return {
+        "user_id": str(user_id),
+        "count": len(response.data),
+        "interactions": response.data
+    }
+
+@app.delete("/interactions/{user_id}")
+def delete_user_interactions(user_id: UUID):
+    """
+    Delete ALL interactions belonging to a specific user.
+    """
+    try:
+        response = (
+            supabase
+            .table("interactions")
+            .delete()
+            .eq("user_id", str(user_id)) 
+            .execute()
+        )
+
+        deleted_count = len(response.data) if response.data else 0
+
+        return {
+            "user_id": str(user_id),
+            "deleted_rows": deleted_count,
+            "status": "success"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

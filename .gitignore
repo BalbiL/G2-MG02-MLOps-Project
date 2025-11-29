@@ -150,6 +150,7 @@ env.bak/
 venv.bak/
 frontend/frontvenv
 api/apivenv
+ml/mlvenv
 
 # Spyder project settings
 .spyderproject

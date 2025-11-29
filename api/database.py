@@ -1,6 +1,10 @@
 import os
 from supabase import create_client, Client
 
+# -----------------------------
+# This file contains the data for the supabase connection
+# -----------------------------
+
 SUPABASE_URL = "https://fnjaisjmtykolnojtafy.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuamFpc2ptdHlrb2xub2p0YWZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzIyNDUyOSwiZXhwIjoyMDc4ODAwNTI5fQ.uPTugqsELADLJvZ0dHaUrhvS2SK48FJJxBlgsJ8_9qo"
 
