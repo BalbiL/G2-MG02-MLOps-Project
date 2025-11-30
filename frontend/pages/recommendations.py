@@ -7,6 +7,7 @@ import sys
 import os
 import textwrap
 from datetime import datetime
+from dateutil import parser
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 if project_root not in sys.path:
@@ -422,10 +423,15 @@ with col4:
         for it in interactions:
             news_details = get_news_details_cached(it['news_id'])
             iso_str = it['event_time']  
-            dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
-
-            # Format timestamp
-            formatted_time = dt.strftime("%d %b %Y, %H:%M")
+            try:
+                 dt = parser.isoparse(iso_str)  # plus robuste que datetime.fromisoformat
+            except Exception as e:
+                # fallback: si jamais parse échoue
+                print(f"Failed to parse date {iso_str}: {e}")
+                dt = None
+            
+                # Format timestamp si parse réussi
+            formatted_time = dt.strftime("%d %b %Y, %H:%M") if dt else "Invalid date"
             scrollable_html +=textwrap.dedent( f"""
             <div style="margin-bottom: 10px;">
                 <span style="font-size:20px; font-weight:600;color:rgb(168,197,206)">ID {it['news_id']}</span><br>
