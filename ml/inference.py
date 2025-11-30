@@ -7,7 +7,7 @@ import tf_keras
 from keras.layers import TFSMLayer
 import scann
 import requests
-
+from ml.database_connection import supabase
 import sys
 import os
 
@@ -32,33 +32,38 @@ ranking_model = lgbm.Booster(model_file=os.path.join(models_dir, "ranking_model.
 
 # Fetch news through API and load them into panda dataframe
 
-
-def fetch_all_news_via_api(limit=3000):
-    offset = 0
+def fetch_all_news(batch_size=5000):
     all_rows = []
+    start = 0
+    batch = 1
 
     while True:
-        params = {"limit": limit, "offset": offset}
-        r = requests.get(f"{API_URL}/news", params=params)
+        end = start + batch_size - 1
 
-        if r.status_code == 404:
-            break  # plus de données
+        print(f"Fetching batch {batch} (rows {start} to {end})...")
 
-        r.raise_for_status()
-        batch = r.json()
+        response = (
+            supabase.table("news")
+            .select("*")
+            .range(start, end)
+            .execute()
+        )
 
-        if not batch:   
+        rows = response.data
+
+        if not rows:
+            print("Done. No more rows.")
             break
 
-        all_rows.extend(batch)
-        offset += limit
-        
-        print(f"Fetched {len(batch)} rows, currenlty loaded a total {len(all_rows)}")
+        all_rows.extend(rows)
+
+        start += batch_size
+        batch += 1
 
     return pd.DataFrame(all_rows)
 
 # Load everything
-all_news_df = fetch_all_news_via_api()
+all_news_df = fetch_all_news()
 print("Total rows for news dataset:", len(all_news_df))
 
 news_ds = tf.data.Dataset.from_tensor_slices({
