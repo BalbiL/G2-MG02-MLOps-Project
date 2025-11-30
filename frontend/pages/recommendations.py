@@ -15,6 +15,8 @@ if project_root not in sys.path:
 # Import function from inference.py that returns recommendations
 from ml.inference import get_session_recommendations
 
+from api_config import API_URL
+api_base_url = API_URL
 
 # -----------------------------
 # Function to fetch user preferred topics
@@ -144,7 +146,7 @@ def select_random_articles(news_list, topics, total=10):
 # -----------------------------
 def generate_model_recommendations():
     
-    HISTORY_NEWS_IDS=set_user_interactions_and_inter_counter()
+    # HISTORY_NEWS_IDS=set_user_interactions_and_inter_counter()
     if "recommended_articles_ids_by_model" not in st.session_state:
         print("Calling the model...")
         st.session_state["recommended_articles_ids_by_model"] = get_session_recommendations(USER_ID, HISTORY_NEWS_IDS, minimal_interactions=INTERACTION_TRESHOLD, k=NUM_RECOMMENDATIONS)
@@ -159,7 +161,7 @@ def generate_model_recommendations():
             # Fetch news details with api call
         recommended_news_by_model = []
         for news_id in st.session_state["recommended_articles_ids_by_model"]:
-            details = fetch_news_details(news_id)
+            details = get_news_details_cached(news_id)
             if details:
                 recommended_news_by_model.append(details)
         if "recommended_articles_by_model" not in st.session_state:
@@ -182,8 +184,7 @@ def set_default_recommendation_articles():
 # Init user interactions and read count
 # -----------------------------
 def set_user_interactions_and_inter_counter():
-    # if "read_count" not in st.session_state:
- 
+    
     user_interactions=fetch_user_interactions(USER_ID)
     st.session_state["read_count"]=user_interactions.get("count")
     
@@ -193,15 +194,44 @@ def set_user_interactions_and_inter_counter():
         if i["event_type"] == "read"
         ]            
   
-    return history_news_ids
+    return history_news_ids, user_interactions
+
+# -----------------------------
+# Optimized fetching of news details for interactions display
+# -----------------------------
+def get_news_details_cached(news_id):
+    cache = st.session_state["cached_news_details"]
+
+    if news_id in cache:
+        return cache[news_id]  
+
+    # --- sinon fetch API ---
+    details = fetch_news_details(news_id)
+
+    # on met en cache
+    cache[news_id] = details
+
+    return details
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+@st.cache_data(show_spinner=False)
+def cached_user_interactions():
+    return set_user_interactions_and_inter_counter()
+
+@st.cache_data(show_spinner=False)
+def cached_user_topics(user_id):
+    return fetch_user_topics(user_id)
+
+@st.cache_data(show_spinner=False)
+def cached_news_by_topics(user_topics):
+    return fetch_news_by_categories(user_topics)
 
 # -----------------------------
 # Config
 # -----------------------------
-api_base_url = "http://localhost:8000"
+
 
 st.set_page_config(page_title="Recommendations", page_icon="📰",layout="wide")
 
@@ -212,29 +242,26 @@ NUM_RECOMMENDATIONS = 10
 INTERACTION_TRESHOLD=10
 
 # Map to display clean strings of topics
-TOPIC_LABELS = {
-    "Autos": "autos",
-    "Entertainment": "entertainment",
-    "Finance": "finance",
-    "Food & Drink": "foodanddrink",
-    "Games": "games",
-    "Health": "health",
-    "Kids": "kids",
-    "Lifestyle": "lifestyle",
-    "Middle East": "middleeast",
-    "Movies": "movies",
-    "Music": "music",
-    "News": "news",
-    "North America": "northamerica",
-    "Sports": "sports",
-    "Travel": "travel",
-    "TV": "tv",
-    "Video": "video",
-    "Weather": "weather"
+INVERSE_TOPIC_LABELS = {
+    "autos": "Autos",
+    "entertainment": "Entertainment",
+    "finance": "Finance",
+    "foodanddrink": "Food & Drink",
+    "games": "Games",
+    "health": "Health",
+    "kids": "Kids",
+    "lifestyle": "Lifestyle",
+    "middleeast": "Middle East",
+    "movies": "Movies",
+    "music": "Music",
+    "news": "News",
+    "northamerica": "North America",
+    "sports": "Sports",
+    "travel": "Travel",
+    "tv": "TV",
+    "video": "Video",
+    "weather": "Weather"
 }
-INVERSE_TOPIC_LABELS = {v: k for k, v in TOPIC_LABELS.items()}
-
-
 
 # -----------------------------
 # Init user session  data
@@ -249,19 +276,20 @@ if USER_ID is None or EMAIL is None:
 
 
 # init global interactions history
-HISTORY_NEWS_IDS=set_user_interactions_and_inter_counter()
+HISTORY_NEWS_IDS,USER_INTERACTIONS=cached_user_interactions()
 
-# Fect user topics
-USER_TOPICS=fetch_user_topics(USER_ID)
+# Fecth user topics
+USER_TOPICS=cached_user_topics(USER_ID)
 
 # Fetch all news for the user's topics
-ALL_NEWS_BY_TOPICS = fetch_news_by_categories(USER_TOPICS)
+ALL_NEWS_BY_TOPICS = cached_news_by_topics(USER_TOPICS)
 
 
 # Set default reccommendations (by topics)
 set_default_recommendation_articles()
 
-
+if "cached_news_details" not in st.session_state:
+    st.session_state["cached_news_details"] = {} 
 
 # Get recommednations by the model
 if len(HISTORY_NEWS_IDS)>=INTERACTION_TRESHOLD and "recommended_articles_ids_by_model" not in st.session_state:
@@ -356,10 +384,13 @@ with col3:
             if st.button("Reset interactions"):
                 resp=delete_user_interactions(USER_ID)
                 if resp is not None:
-                    HISTORY_NEWS_IDS=set_user_interactions_and_inter_counter()
+                    # Clear cache and refetch it
+                    cached_user_interactions.clear()
+                    HISTORY_NEWS_IDS=cached_user_interactions()
                     RECOMMENDED_NEWS_BY_MODEL=[]
                     MODEL_GENERATED_NEWS_FLAG=False
                     st.session_state.pop("recommended_articles_ids_by_model", None)
+                    st.session_state["cached_news_details"].clear()
                     st.success("Deleted all your previous interactions!")
                     time.sleep(1)
                     st.rerun()
@@ -370,7 +401,7 @@ with col3:
 # -----------------------------
 with col4:
     
-    interactions_data = fetch_user_interactions(USER_ID)
+    interactions_data = USER_INTERACTIONS
     if interactions_data and interactions_data["interactions"]:
         interactions = interactions_data["interactions"]
 
@@ -389,8 +420,8 @@ with col4:
         """)
 
         for it in interactions:
-            news_details=fetch_news_details(it['news_id'])
-            iso_str = it['event_time']  # 
+            news_details = get_news_details_cached(it['news_id'])
+            iso_str = it['event_time']  
             dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
 
             # Format timestamp
@@ -434,7 +465,8 @@ with col1:
                         
                         ok = send_interaction(USER_ID, news["id"], "read")
                         if ok:
-                            HISTORY_NEWS_IDS=set_user_interactions_and_inter_counter()
+                            cached_user_interactions.clear()
+                            HISTORY_NEWS_IDS=cached_user_interactions()
                             st.success("Interaction saved!")
                             st.rerun()
             
@@ -479,11 +511,12 @@ with col2:
                     st.markdown(news['abstract'], unsafe_allow_html=True)
 
                     # Red button
-                    if st.button("Mark as read👁️", key=f"read_btn_{news['id']}"):
+                    if st.button("Mark as read👁️", key=f"read_btn_model_{news['id']}"):
                         
                         ok = send_interaction(USER_ID, news["id"], "read")
                         if ok:
-                            HISTORY_NEWS_IDS=set_user_interactions_and_inter_counter()
+                            cached_user_interactions.clear()
+                            HISTORY_NEWS_IDS=cached_user_interactions()
                             st.success("Interaction saved!")
                             st.rerun()
             

@@ -1,8 +1,11 @@
 import streamlit as st
 import requests
 
-api_base_url = "http://localhost:8000"
-
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from api_config import API_URL
+api_base_url = API_URL
+st.cache_data.clear()
 # -----------------------------
 # Fetch authenticated users
 # -----------------------------
@@ -135,6 +138,7 @@ with st.container(horizontal_alignment="center",vertical_alignment="center", bor
         # -------------------------
         if st.button("Log out"):
             st.session_state.clear()
+            st.cache_data.clear()
             st.success("Successfully logged out...")
             st.rerun()
 

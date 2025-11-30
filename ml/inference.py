@@ -11,6 +11,7 @@ import requests
 import sys
 import os
 
+from api_config import API_URL
 # -----------------------------
 # This file contains the functions that allows to return the model recommendations
 # -----------------------------
@@ -30,7 +31,7 @@ scann_index = tf.saved_model.load(os.path.join(models_dir, "scann_index")) # Ret
 ranking_model = lgbm.Booster(model_file=os.path.join(models_dir, "ranking_model.txt")) # Ranking
 
 # Fetch news through API and load them into panda dataframe
-API_URL = "http://localhost:8000/news"
+
 
 def fetch_all_news_via_api(limit=3000):
     offset = 0
@@ -38,7 +39,7 @@ def fetch_all_news_via_api(limit=3000):
 
     while True:
         params = {"limit": limit, "offset": offset}
-        r = requests.get(API_URL, params=params)
+        r = requests.get(f"{API_URL}/news", params=params)
 
         if r.status_code == 404:
             break  # plus de données

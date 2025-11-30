@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
+from api_config import API_URL
 
-# API base URL
-api_base_url = "http://localhost:8000"
+api_base_url = API_URL
 
 st.set_page_config(page_title="Onboarding", layout="centered")
 
