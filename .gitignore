@@ -1,6 +1,7 @@
 .streamlit/secrets.toml
 *mind_large*
 ml/models
+ml/embeddings
 
 
 # Byte-compiled / optimized / DLL files

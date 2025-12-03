@@ -21,7 +21,7 @@ models_dir = os.path.join(current_dir, "models/models")
 
 
 # Load indexes and news embeddings 
-news_index = tf.saved_model.load("models/news_index")
+news_index = tf.saved_model.load("models/models/news_index")
 with open("embeddings/news_ids.json", "r") as f:
     sorted_ids = json.load(f)
 sorted_vectors = np.load("embeddings/news_embeddings.npy")
@@ -61,7 +61,7 @@ def fetch_all_news_via_api(limit=3000):
 
 # Load everything
 all_news_df = fetch_all_news_via_api()
-print("Total rows for news dataset:", len(all_news_df))
+print("Total rows for news dataset:", len(all_news_df),all_news_df.columns)
 
 
 # Exclude clicked news
@@ -75,7 +75,7 @@ def exclude_clicked_news(scored_news_ids, user_clicked_news_ids):
 cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 def ranker(user_history, scored_news_ids, all_news_df):
   # # Create a lookup dictionary
-  id_to_title = dict(zip(all_news_df["news_id"], all_news_df["title"]))
+  id_to_title = dict(zip(all_news_df["id"], all_news_df["title"]))
   user_history_titles = [id_to_title[nid] for nid in user_history]
   scored_news_ids_titles = [id_to_title[nid] for nid in scored_news_ids]
   # Create the query string
@@ -107,7 +107,7 @@ def ranker(user_history, scored_news_ids, all_news_df):
 
 
 # Re-ranker
-def mmr_rerank(ranked_results, all_news_embeddings_dict, lambda_val=0.5, k=20):
+def mmr_rerank(ranked_results, all_news_embeddings_dict, lambda_val=0.5, k=None):
   if not ranked_results:
     return []
 
