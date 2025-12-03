@@ -1,11 +1,26 @@
 import streamlit as st
 import requests
-
+import threading
+import time
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from api_config import API_URL
 api_base_url = API_URL
 st.cache_data.clear()
+
+
+
+def preload_inference():
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if project_root not in sys.path:
+        sys.path.append(project_root)
+
+    # Importer le modèle
+    from ml import inference
+    print("Inference preloaded !")
+
+threading.Thread(target=preload_inference, daemon=True).start()
+
 # -----------------------------
 # Fetch authenticated users
 # -----------------------------
