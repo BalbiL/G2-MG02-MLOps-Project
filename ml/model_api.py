@@ -40,7 +40,7 @@ def recommend(req: RecommendationRequest):
             user_history=req.user_history,
             all_news_df=all_news_df,
             all_news_embeddings_dict=all_news_embeddings_dict,
-            required_length=req.required_length,
+            required_length=10,
             k=req.k
         )
 

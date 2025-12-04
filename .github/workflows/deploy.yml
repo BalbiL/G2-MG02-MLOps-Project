@@ -1,0 +1,77 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - deployment_version
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH Key
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key.pem
+          chmod 600 ~/.ssh/deploy_key.pem
+
+      # ---------------------------------------------------------
+      # 1. DÉPLOIEMENT FRONTEND (Instance Publique)
+      # ---------------------------------------------------------
+      - name: Deploy Frontend (Streamlit)
+        run: |
+          echo " Deploying Frontend..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key.pem ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} "
+            cd frontend &&
+            echo ' Stopping service...' &&
+            sudo systemctl stop streamlit.service &&
+            echo '⬇️ Pulling latest code...' &&
+            git fetch origin deployment_version &&
+            git reset --hard origin/deployment_version &&
+            echo '✅ Starting service...' &&
+            sudo systemctl start streamlit.service
+          "
+
+      # ---------------------------------------------------------
+      # 2. DÉPLOIEMENT API SUPABASE (Instance Privée via Bastion)
+      # ---------------------------------------------------------
+      - name: Deploy API Backend
+        run: |
+          echo "🚀 Deploying API Backend..."
+          # Notez l'option -J (Jump) qui passe par le Bastion
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key.pem \
+            -J ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} \
+            ${{ secrets.SSH_USER }}@${{ secrets.API_PRIVATE_IP }} "
+            cd api &&
+            echo '🛑 Stopping service...' &&
+            sudo systemctl stop fastapi.service &&
+            echo '⬇️ Pulling latest code...' &&
+            git fetch origin deployment_version &&
+            git reset --hard origin/deployment_version &&
+            echo '✅ Starting service...' &&
+            sudo systemctl start fastapi.service
+          "
+
+      # ---------------------------------------------------------
+      # 3. DÉPLOIEMENT MODEL API (Instance Privée via Bastion)
+      # ---------------------------------------------------------
+      - name: Deploy Model API
+        run: |
+          echo "🚀 Deploying Model API..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key.pem \
+            -J ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} \
+            ${{ secrets.SSH_USER }}@${{ secrets.MODEL_PRIVATE_IP }} "
+            # Attention au chemin spécifique de votre disque de données
+            cd /data/VOLUME_MODEL_API/MODEL_API/ml &&
+            echo '🛑 Stopping service...' &&
+            sudo systemctl stop model-api.service &&
+            echo '⬇️ Pulling latest code...' &&
+            git fetch origin deployment_version &&
+            git reset --hard origin/deployment_version &&
+            echo '✅ Starting service...' &&
+            sudo systemctl start model-api.service
+          "
