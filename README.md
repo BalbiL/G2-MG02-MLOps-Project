@@ -15,9 +15,10 @@ We also apply diversity-aware re-ranking to keep recommendations relevant while 
 └── ml                 # Machine learning models, training scripts,feature extraction and backend API to serve model results through HTTP
 ```
 
-## Main Features
+## OVA Overview
 
-(Coming soon)
+![OVA Overview](images/ova.jpeg)
+
 
 
 ## Technical Stack
@@ -27,12 +28,13 @@ We also apply diversity-aware re-ranking to keep recommendations relevant while 
 | **Data** | NumPy, Pandas, Supabase, SQL|
 | **API** | FastAPI |
 | **Machine Learning** | TensorFlow, TensorFlow Recommenders, Sentence Transformers |
+| **MLOps** | MLFlow, DagsHub |
 | **Frontend** | Streamlit |
 | **Language** | Python 3.12+ |
 | **Deployment** | AWS EC2 |
 
 ## How to run it locally ?
-**This section assumes you are using a linux distro**. Commnds may vary for other OSs (windows,macOS)
+**This section assumes you are using a linux distro**. Commands may vary for other OSs (windows, macOS)
 ## Prerequisites
 
 Ensure you have the following installed on your machine:
@@ -190,9 +192,11 @@ You can retrain the model using the `RecSys_One_vs_All.ipynb` notebook found in 
 * **Other hyperparameters** (batch size, epochs, etc.) 
 
 To run the training workflow:
-1. Open the notebook in a suitable environment (Jupyter Notebook, Google Colab, Kaggle Notebooks, etc.).
-2. Adjust any parameters you want to change.
-3. Run the notebook cells sequentially.
+1. Create a DagsHub account and note your **username** and **repository name**.
+2. Open the notebook in a suitable environment (Jupyter Notebook, Google Colab, Kaggle Notebooks, etc.).
+3. Modify the `dagshub.init` line in the notebook by adding your dagshub username and the repository name
+4. Adjust any parameters you want to change.
+5. Run the notebook cells sequentially.
 
 ## **The Team** 
 * **Arthur DELFOSSE** (arthur.delfosse@edu.ece.fr) - Project Lead
