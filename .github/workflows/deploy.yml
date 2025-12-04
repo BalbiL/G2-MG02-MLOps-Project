@@ -51,7 +51,7 @@ jobs:
             
             # 1. On lance SSH depuis le Bastion vers l'instance Privée
             # Assurez-vous que le chemin vers la clé sur le bastion est correct !
-            ssh -o StrictHostKeyChecking=no -i /ssh/fast-api-key.pem ${{ secrets.SSH_USER }}@${{ secrets.API_PRIVATE_IP }} '
+            ssh -o StrictHostKeyChecking=no -i /home/ec2-user/ssh/fast-api-key.pem ${{ secrets.SSH_USER }}@${{ secrets.API_PRIVATE_IP }} '
                 
                 # --- TOUT CE QUI SUIT S'EXÉCUTE SUR L'INSTANCE PRIVÉE ---
                 cd FAST_API_WEBAPP &&
