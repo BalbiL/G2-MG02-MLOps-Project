@@ -26,7 +26,7 @@ jobs:
         run: |
           echo " Deploying Frontend..."
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key.pem ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} "
-            cd frontend &&
+            cd APP_WEB_STREAMLIT &&
             echo ' Stopping service...' &&
             sudo systemctl stop streamlit.service &&
             echo '⬇️ Pulling latest code...' &&
@@ -46,7 +46,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key.pem \
             -J ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} \
             ${{ secrets.SSH_USER }}@${{ secrets.API_PRIVATE_IP }} "
-            cd api &&
+            cd FAST_API_WEBAPP &&
             echo '🛑 Stopping service...' &&
             sudo systemctl stop fastapi.service &&
             echo '⬇️ Pulling latest code...' &&
@@ -66,7 +66,7 @@ jobs:
             -J ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} \
             ${{ secrets.SSH_USER }}@${{ secrets.MODEL_PRIVATE_IP }} "
             # Attention au chemin spécifique de votre disque de données
-            cd /data/VOLUME_MODEL_API/MODEL_API/ml &&
+            cd /data/VOLUME_MODEL_API/MODEL_API &&
             echo '🛑 Stopping service...' &&
             sudo systemctl stop model-api.service &&
             echo '⬇️ Pulling latest code...' &&
