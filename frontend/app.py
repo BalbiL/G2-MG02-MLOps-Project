@@ -61,7 +61,7 @@ def fetch_user_topics(user_id: str):
 # Page config
 # -----------------------------
 st.set_page_config(
-    page_title="News Recommender",
+    page_title="News Recommender 67",
     page_icon="📰",
     layout="centered"
 )

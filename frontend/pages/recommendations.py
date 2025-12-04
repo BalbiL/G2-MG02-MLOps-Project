@@ -312,7 +312,8 @@ if "cached_news_details" not in st.session_state:
 
 # Get recommednations by the model
 if len(HISTORY_NEWS_IDS)>=INTERACTION_TRESHOLD and "recommended_articles_ids_by_model" not in st.session_state:
-    st.session_state["recommended_articles_by_model"]=generate_model_recommendations()
+    with st.spinner('Loading your recommendations...'):
+        st.session_state["recommended_articles_by_model"]=generate_model_recommendations()
    
 else:
     RECOMMENDED_NEWS_BY_MODEL=[]
