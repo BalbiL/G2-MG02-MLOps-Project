@@ -42,18 +42,27 @@ jobs:
       - name: Deploy API Backend
         run: |
           echo "🚀 Deploying API Backend..."
-          # Notez l'option -J (Jump) qui passe par le Bastion
+          
+          # On se connecte au BASTION uniquement
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key.pem \
-            -J ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} \
-            ${{ secrets.SSH_USER }}@${{ secrets.API_PRIVATE_IP }} "
-            cd FAST_API_WEBAPP &&
-            echo '🛑 Stopping service...' &&
-            sudo systemctl stop fastapi.service &&
-            echo '⬇️ Pulling latest code...' &&
-            git fetch origin deployment_version &&
-            git reset --hard origin/deployment_version &&
-            echo '✅ Starting service...' &&
-            sudo systemctl start fastapi.service
+            ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} "
+            
+            # --- TOUT CE QUI SUIT S'EXÉCUTE SUR LE BASTION ---
+            
+            # 1. On lance SSH depuis le Bastion vers l'instance Privée
+            # Assurez-vous que le chemin vers la clé sur le bastion est correct !
+            ssh -o StrictHostKeyChecking=no -i /ssh/fast-api-key.pem ${{ secrets.SSH_USER }}@${{ secrets.API_PRIVATE_IP }} '
+                
+                # --- TOUT CE QUI SUIT S'EXÉCUTE SUR L'INSTANCE PRIVÉE ---
+                cd FAST_API_WEBAPP &&
+                echo \"🛑 Stopping service...\" &&
+                sudo systemctl stop fastapi.service &&
+                echo \"⬇️ Pulling latest code...\" &&
+                git fetch origin deployment_version &&
+                git reset --hard origin/deployment_version &&
+                echo \"✅ Starting service...\" &&
+                sudo systemctl start fastapi.service
+            '
           "
 
       # ---------------------------------------------------------
