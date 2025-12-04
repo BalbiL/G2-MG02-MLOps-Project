@@ -1,16 +1,11 @@
 import streamlit as st
 import requests
 import random
-from math import floor, ceil
 import time
-import sys
-import os
 import textwrap
 from datetime import datetime
 
-# project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-# if project_root not in sys.path:
-#     sys.path.append(project_root)
+
 
 
 from api_config import API_URL,MODEL_API_URL
