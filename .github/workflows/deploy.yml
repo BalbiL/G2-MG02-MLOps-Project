@@ -71,16 +71,28 @@ jobs:
       - name: Deploy Model API
         run: |
           echo "🚀 Deploying Model API..."
+          
+          # 1. Connexion au BASTION
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key.pem \
-            -J ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} \
-            ${{ secrets.SSH_USER }}@${{ secrets.MODEL_PRIVATE_IP }} "
-            # Attention au chemin spécifique de votre disque de données
-            cd /data/VOLUME_MODEL_API/MODEL_API &&
-            echo '🛑 Stopping service...' &&
-            sudo systemctl stop model-api.service &&
-            echo '⬇️ Pulling latest code...' &&
-            git fetch origin deployment_version &&
-            git reset --hard origin/deployment_version &&
-            echo '✅ Starting service...' &&
-            sudo systemctl start model-api.service
+            ${{ secrets.SSH_USER }}@${{ secrets.BASTION_HOST }} "
+            
+            # 2. Depuis le Bastion, connexion à l'instance MODEL
+            # (On utilise la même clé qui est stockée sur le bastion)
+            ssh -o StrictHostKeyChecking=no -i /home/ec2-user/ssh/fast-api-vm-key.pem ${{ secrets.SSH_USER }}@${{ secrets.MODEL_PRIVATE_IP }} '
+                
+                # --- COMMANDES SUR L INSTANCE MODEL ---
+                
+                # Assurez-vous que ce chemin est bien la racine de votre repo Git
+                cd /data/VOLUME_MODEL_API/MODEL_API &&
+                
+                echo \"🛑 Stopping service...\" &&
+                sudo systemctl stop model-api.service &&
+                
+                echo \"⬇️ Pulling latest code...\" &&
+                git fetch origin deployment_version &&
+                git reset --hard origin/deployment_version &&
+                
+                echo \"✅ Starting service...\" &&
+                sudo systemctl start model-api.service
+            '
           "
