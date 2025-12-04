@@ -10,6 +10,11 @@ from new_inference import (
 
 app = FastAPI(title="Model Recommendation API")
 
+@app.get("/")
+def read_root():
+    # FastAPI convertit automatiquement le dictionnaire Python en réponse JSON.
+    return {"message": "API for model recommendations is running successfully!"}
+
 class RecommendationRequest(BaseModel):
     user_id: str
     user_history: List[str]

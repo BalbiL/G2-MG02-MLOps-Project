@@ -48,6 +48,10 @@ Clone the repo in the desired folder with:
 ```bash
 git clone https://github.com/ArthurDelf/Session-Based-News-Recommendation.git
 ```
+  You can now move into the root folder of the repo Session-Based-News-Recommendation/ with:
+```bash
+cd Session-Based-News-Recommendation
+```
 
 The app runs with **3 separate modules**:
 * **The API module** to interact with supabase tables
@@ -83,7 +87,8 @@ From the root of the git repo:
    uvicorn main:app --reload
    ```
 The app should be running on port **8000** of localhost. You can check its working fine at http://localhost:8000/docs.  
-Keep the terminal window with the app running opened and open a new terminal window for the next step.
+#### ⚠️Important
+Keep the terminal window with the supabase api app running opened and open a new terminal window for the next step.
 
 ---
 
@@ -132,10 +137,12 @@ Once the download is over you can:
    ```bash
    uvicorn model_api:app --reload --port 9000
    ```
-
-  The app should be running on port **9000** of localhost. You can check its working fine at http://localhost:9000/docs.
-  Note that the startup of the app can take a few seconds (30s), but that only happens when you first start the api.  
-  Keep the terminal window with the app running opened and open a new terminal window for the next step.
+   The model_api app should be running on port **9000** of localhost. The startup of the app can take a few seconds (30s), you should see the news being fetched. 
+   <br>
+   Once it is done, you can check its working fine at http://localhost:9000/docs.
+    
+  #### ⚠️Important
+  Keep the terminal window with the model_api app running opened and open a new terminal window for the next step.
 
 ---
 

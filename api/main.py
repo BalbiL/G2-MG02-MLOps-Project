@@ -10,6 +10,9 @@ import traceback
 # -----------------------------
 app = FastAPI()
 
+@app.get("/")
+def read_root():
+    return {"message": "API for supabase is running successfully!"}
 
 #-------------------------------------------- Routes for the news table-----------------------------------------------------
 
