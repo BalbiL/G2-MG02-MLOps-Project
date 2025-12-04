@@ -223,7 +223,7 @@ st.set_page_config(page_title="Recommendations", page_icon="📰",layout="wide")
 NUM_RECOMMENDATIONS = 10
 
 # Minimum of interaction for personnalized recs
-INTERACTION_TRESHOLD=10
+INTERACTION_TRESHOLD=3
 
 # Map to display clean strings of topics
 TOPIC_LABELS = {

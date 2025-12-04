@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Optional
-
+# from frontend.app.recommendations import INTERACTION_TRESHOLD
 from new_inference import (
     get_session_recommendations,
     all_news_df,
@@ -44,7 +44,7 @@ def recommend(req: RecommendationRequest):
             user_history=req.user_history,
             all_news_df=all_news_df,
             all_news_embeddings_dict=all_news_embeddings_dict,
-            required_length=req.required_length,
+            required_length=10,
             k=req.k
         )
 
