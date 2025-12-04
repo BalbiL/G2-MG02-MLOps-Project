@@ -5,7 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import CrossEncoder
 import tensorflow as tf
 import json
-from ml.database_connection import supabase
+from database_connection import supabase
 import sys
 import os
 
