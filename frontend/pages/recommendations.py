@@ -14,9 +14,8 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 # Import function from inference.py that returns recommendations
-from ml.inference import get_session_recommendations
-
-from api_config import API_URL
+# from ml.inference import get_session_recommendations
+from api_config import API_URL, MODEL_API_URL
 api_base_url = API_URL
 
 # -----------------------------
@@ -147,29 +146,48 @@ def select_random_articles(news_list, topics, total=10):
 # -----------------------------
 def generate_model_recommendations():
     
-    # HISTORY_NEWS_IDS=set_user_interactions_and_inter_counter()
-    if "recommended_articles_ids_by_model" not in st.session_state:
-        print("Calling the model...")
-        st.session_state["recommended_articles_ids_by_model"] = get_session_recommendations(USER_ID, HISTORY_NEWS_IDS, minimal_interactions=INTERACTION_TRESHOLD, k=NUM_RECOMMENDATIONS)
+    # HISTORY_NEWS_IDS = set_user_interactions_and_inter_counter()
 
-        if len(st.session_state["recommended_articles_ids_by_model"])==0:
-            print("Requirement not satisfied for model recs")
+    if "recommended_articles_ids_by_model" not in st.session_state:
+        print("Calling model API...")
+
+        payload = {
+            "user_id": USER_ID,
+            "user_history": list(HISTORY_NEWS_IDS),
+            "required_length": INTERACTION_TRESHOLD,
+            "k": NUM_RECOMMENDATIONS,
+        }
+
+        # --- API CALL ---
+        response = requests.post(f"{MODEL_API_URL}/recommend", json=payload)
+        data = response.json()
+
+        if "error" in data:
+            print("Model API error:", data["error"])
             return []
-        else:
-            st.session_state["recommended_articles_ids_by_model"] = [str(n) for n in st.session_state["recommended_articles_ids_by_model"]]
-            print("Model recs IDS:",st.session_state["recommended_articles_ids_by_model"])
-            
-            # Fetch news details with api call
-        recommended_news_by_model = []
-        for news_id in st.session_state["recommended_articles_ids_by_model"]:
-            details = get_news_details_cached(news_id)
-            if details:
-                recommended_news_by_model.append(details)
-        if "recommended_articles_by_model" not in st.session_state:
-            
-            st.session_state["recommended_articles_by_model"]=recommended_news_by_model
-            
-        return recommended_news_by_model
+
+        recs = data.get("recommendations", [])
+
+        if len(recs) == 0:
+            print("No recommendations returned by model API.")
+            return []
+        
+        
+        st.session_state["recommended_articles_ids_by_model"] = recs
+
+        print("Model recs IDs:", st.session_state["recommended_articles_ids_by_model"])
+
+    # ---- Fetch des détails des news via API interne ----
+    recommended_news_by_model = []
+    for news_id in st.session_state["recommended_articles_ids_by_model"]:
+        details = fetch_news_details(news_id)
+        if details:
+            recommended_news_by_model.append(details)
+
+    if "recommended_articles_by_model" not in st.session_state:
+        st.session_state["recommended_articles_by_model"] = recommended_news_by_model
+
+    return recommended_news_by_model
 
 # -----------------------------
 # Set user recommanded articles
