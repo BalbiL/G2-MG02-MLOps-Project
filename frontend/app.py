@@ -10,16 +10,16 @@ st.cache_data.clear()
 
 
 
-def preload_inference():
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    if project_root not in sys.path:
-        sys.path.append(project_root)
+# def preload_inference():
+#     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+#     if project_root not in sys.path:
+#         sys.path.append(project_root)
 
-    # Importer le modèle
-    from ml import inference
-    print("Inference preloaded !")
+#     # Importer le modèle
+#     from ml import inference
+#     print("Inference preloaded !")
 
-threading.Thread(target=preload_inference, daemon=True).start()
+# threading.Thread(target=preload_inference, daemon=True).start()
 
 # -----------------------------
 # Fetch authenticated users

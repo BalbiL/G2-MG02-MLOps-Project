@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   # --- Service ML ---
@@ -40,7 +40,10 @@ services:
     ports:
       - "8501:8501"
     environment:
-      - API_HOST=api-service   # Nom du service docker ci-dessus
+      - API_HOST=api-service
       - API_PORT=8000
+      # ⚠️ AJOUTEZ CES LIGNES : ⚠️
+      - MODEL_HOST=ml-service   # Permet de trouver le container ML
+      - MODEL_PORT=9000
     depends_on:
       - api-service
