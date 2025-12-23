@@ -6,4 +6,3 @@ sentence-transformers
 fastapi
 uvicorn
 tf-keras
-supabase

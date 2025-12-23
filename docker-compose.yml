@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # --- Service ML ---
+  ml-service:
+    build:
+      context: .
+      dockerfile: ml/Dockerfile
+    container_name: ml-container
+    ports:
+      - "9000:9000"
+    # Si vous ne voulez pas copier les modèles dans l'image (car trop gros),
+    # décommentez les lignes ci-dessous pour monter le dossier local ml/ dans le conteneur :
+    # volumes:
+    #   - ./ml:/app/ml
+
+  # --- Service API (Backend) ---
+  api-service:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: api-container
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_HOST=ml-service  # Nom du service docker ci-dessus
+      - MODEL_PORT=9000
+      # Ajoutez vos credentials Supabase ici ou dans un fichier .env
+      - SUPABASE_URL=${SUPABASE_URL} 
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    depends_on:
+      - ml-service
+
+  # --- Service Frontend (Streamlit) ---
+  frontend-service:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: frontend-container
+    ports:
+      - "8501:8501"
+    environment:
+      - API_HOST=api-service   # Nom du service docker ci-dessus
+      - API_PORT=8000
+    depends_on:
+      - api-service

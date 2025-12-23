@@ -1,11 +1,1 @@
-sklearn
 streamlit
-tensorflow
-tf_keras
-pandas
-numpy
-scikit-learn
-lightgbm
-tensorflow
-scann
-supabase
