@@ -1,0 +1,76 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    branches:
+      - deployment_version
+
+env:
+  AWS_REGION: eu-west-3               # Votre région (Paris)
+  # Noms de vos repositories ECR (à créer sur AWS avant de lancer)
+  ECR_REPO_ML: g2-mg02-news-reco-ml
+  ECR_REPO_API: g2-mg02-news-reco-api
+  ECR_REPO_FRONTEND: g2-mg02-news-reco-frontend
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Récupération du code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Installation de Python (pour lancer votre script de download)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # 3. Téléchargement des Modèles (Crucial avant le build Docker)
+      # Le script utilise urllib (natif), donc pas besoin de 'pip install requests'
+      - name: Download ML Models
+        run: |
+          python download-models.py
+          # Vérification que les fichiers sont bien là (pour le debug)
+          ls -R ml/models/
+
+      # 4. Connexion à AWS (Nécessaire pour le push ECR)
+      # N'oubliez pas de mettre à jour vos secrets GitHub si votre token a changé !
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # 5. Build & Push - Service ML
+      - name: Build and push ML image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          # Le contexte est '.' (racine) pour pouvoir copier api_config.py si besoin
+          docker build -t $ECR_REGISTRY/$ECR_REPO_ML:latest -f ml/Dockerfile .
+          docker push $ECR_REGISTRY/$ECR_REPO_ML:latest
+
+      # 6. Build & Push - Service API
+      - name: Build and push API image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPO_API:latest -f api/Dockerfile .
+          docker push $ECR_REGISTRY/$ECR_REPO_API:latest
+
+      # 7. Build & Push - Service Frontend
+      - name: Build and push Frontend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPO_FRONTEND:latest -f frontend/Dockerfile .
+          docker push $ECR_REGISTRY/$ECR_REPO_FRONTEND:latest
