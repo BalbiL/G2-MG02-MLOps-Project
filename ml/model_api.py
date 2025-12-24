@@ -17,6 +17,15 @@ class RecommendationRequest(BaseModel):
     required_length: Optional[int] = 10
     k: Optional[int] = 20
 
+
+@app.get("/health")
+def health_check():
+    """
+    Renvoie un statut 200 OK si l'API est en vie.
+    Utilisé par Docker pour vérifier si le modèle est chargé.
+    """
+    return {"status": "healthy", "model_loaded": True}
+
 @app.post("/recommend")
 def recommend(req: RecommendationRequest):
 
