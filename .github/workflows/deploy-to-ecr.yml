@@ -28,29 +28,31 @@ jobs:
         with:
           python-version: '3.9'
 
-      # [TESTS] Configuration corrigée avec PYTHONPATH et __init__.py
+      # [TESTS] Configuration corrigée avec Mock Env Vars
       - name: Run Unit Tests
         env:
-          PYTHONPATH: .  # Indispensable pour que les tests trouvent les modules 'api' et 'ml'
+          PYTHONPATH: .
+          # [CORRECTION] On donne des valeurs bidon pour que database.py ne plante pas à l'import
+          SUPABASE_URL: "https://test.supabase.co"
+          SUPABASE_KEY: "dummy-key-for-tests"
         run: |
           echo "Installation des dépendances de test..."
           pip install pytest httpx
           
-          # Installation des libs nécessaires pour que les imports Python fonctionnent
+          # Installation des libs nécessaires
           pip install fastapi uvicorn pydantic supabase
           
           echo "Running API Tests..."
           python -m pytest api/tests/
           
           echo "Running ML API Tests..."
-          # Fonctionne car vous avez ajouté __init__.py et mocké tensorflow dans test_ml.py
+          # Mockons aussi tensorflow si besoin dans le code de test, mais ici on lance juste
           python -m pytest ml/tests/
 
       # 3. Téléchargement des Modèles
       - name: Download ML Models
         run: |
           python download-models.py
-          # Vérification (debug)
           ls -R ml/models/
 
       # 4. Connexion à AWS (Avec clés IAM fixes)
