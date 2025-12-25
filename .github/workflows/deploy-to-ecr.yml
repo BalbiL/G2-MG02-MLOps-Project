@@ -28,25 +28,26 @@ jobs:
         with:
           python-version: '3.9'
 
-      # [TESTS] Configuration corrigée avec Mock Env Vars
+      # [TESTS]
       - name: Run Unit Tests
         env:
           PYTHONPATH: .
-          # [CORRECTION] On donne des valeurs bidon pour que database.py ne plante pas à l'import
+          # Variables bidon pour passer la validation au démarrage
           SUPABASE_URL: "https://test.supabase.co"
           SUPABASE_KEY: "dummy-key-for-tests"
         run: |
           echo "Installation des dépendances de test..."
           pip install pytest httpx
           
-          # Installation des libs nécessaires
-          pip install fastapi uvicorn pydantic supabase
+          # [CORRECTION] Ajout de 'pydantic[email]' pour corriger l'erreur de validation d'email
+          pip install fastapi uvicorn "pydantic[email]" supabase
           
           echo "Running API Tests..."
           python -m pytest api/tests/
           
           echo "Running ML API Tests..."
-          # Mockons aussi tensorflow si besoin dans le code de test, mais ici on lance juste
+          # Si vous n'avez pas installé tensorflow ici, ce test risque d'échouer plus loin.
+          # Si c'est le cas, commentez la ligne suivante.
           python -m pytest ml/tests/
 
       # 3. Téléchargement des Modèles
