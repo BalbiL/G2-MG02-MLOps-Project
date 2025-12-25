@@ -86,7 +86,7 @@ with st.container(horizontal_alignment="center",vertical_alignment="center", bor
             text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             margin-top:20px;
         ">
-            Session Based News Recommender 3.0
+            Session Based News Recommender
         </h2>
         """,
         unsafe_allow_html=True
