@@ -4,12 +4,10 @@ provider "aws" {
 
 # --- 1. RÉCUPÉRATION DES RESSOURCES EXISTANTES ---
 
-# On récupère le rôle IAM existant (celui mentionné dans votre JSON)
 data "aws_iam_role" "execution_role" {
   name = "ecsTaskExecutionRole"
 }
 
-# [NOUVEAU] On récupère le VPC par défaut pour y créer le Security Group
 data "aws_vpc" "default" {
   default = true
 }
@@ -25,30 +23,23 @@ resource "aws_cloudwatch_log_group" "ecs_logs" {
   retention_in_days = 1
 }
 
-# --- [NOUVEAU] 4. SECURITY GROUP (Pare-feu) ---
-# Terraform va créer ce groupe de sécurité automatiquement
-resource "aws_security_group" "app_sg" {
-  name        = "g2-mg02-news-reco-sg-tf"
-  description = "Security Group managed by Terraform for ECS"
+# --- 4. SÉCURITÉ (Security Groups) ---
+
+# Groupe de sécurité pour l'ALB (Lui doit être accessible sur le port 80 public)
+resource "aws_security_group" "alb_sg" {
+  name        = "g2-mg02-alb-sg"
+  description = "Security Group for Application Load Balancer"
   vpc_id      = data.aws_vpc.default.id
 
-  # Autoriser Streamlit (8501) depuis partout
+  # Entrée : HTTP (80) ouvert à tous
   ingress {
-    from_port   = 8501
-    to_port     = 8501
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Autoriser l'API (8000) depuis partout
-  ingress {
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Règle de sortie (Egress) : Indispensable pour télécharger les images Docker !
+  # Sortie : Tout autorisé (pour parler aux conteneurs)
   egress {
     from_port   = 0
     to_port     = 0
@@ -57,7 +48,81 @@ resource "aws_security_group" "app_sg" {
   }
 }
 
-# --- 5. TASK DEFINITION (Le plan des conteneurs) ---
+# Groupe de sécurité pour les Conteneurs ECS
+resource "aws_security_group" "app_sg" {
+  name        = "g2-mg02-news-reco-sg-tf"
+  description = "Security Group managed by Terraform for ECS"
+  vpc_id      = data.aws_vpc.default.id
+
+  # Autoriser Streamlit (8501) 
+  # (Idéalement on restreindrait à "security_groups = [aws_security_group.alb_sg.id]", 
+  # mais pour le debug on laisse 0.0.0.0/0)
+  ingress {
+    from_port   = 8501
+    to_port     = 8501
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Autoriser l'API (8000)
+  ingress {
+    from_port   = 8000
+    to_port     = 8000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# --- [NOUVEAU] 5. LOAD BALANCER (ALB) ---
+
+resource "aws_lb" "main" {
+  name               = "g2-mg02-news-reco-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = [
+      "subnet-03ac2adb51071d022",
+      "subnet-04274dee3c914f032",
+      "subnet-04ac053b02c2936d8"
+  ]
+}
+
+resource "aws_lb_target_group" "front_tg" {
+  name        = "g2-mg02-front-tg"
+  port        = 8501
+  protocol    = "HTTP"
+  vpc_id      = data.aws_vpc.default.id
+  target_type = "ip" # OBLIGATOIRE pour Fargate
+
+  health_check {
+    path                = "/"    # Streamlit répond sur la racine
+    matcher             = "200"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+
+resource "aws_lb_listener" "front_listener" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.front_tg.arn
+  }
+}
+
+# --- 6. TASK DEFINITION ---
 resource "aws_ecs_task_definition" "app" {
   family                   = "g2-mg02-news-reco-task"
   network_mode             = "awsvpc"
@@ -136,7 +201,7 @@ resource "aws_ecs_task_definition" "app" {
   ])
 }
 
-# --- 6. SERVICE ECS (Le déploiement) ---
+# --- 7. SERVICE ECS (Mis à jour) ---
 resource "aws_ecs_service" "app_service" {
   name            = "g2-mg02-news-reco-task-service-nyvdt5tq"
   cluster         = aws_ecs_cluster.main.id
@@ -144,17 +209,28 @@ resource "aws_ecs_service" "app_service" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
+  # [NOUVEAU] Connexion au Load Balancer
+  load_balancer {
+    target_group_arn = aws_lb_target_group.front_tg.arn
+    container_name   = "g2-mg02-frontend-container"
+    container_port   = 8501
+  }
+
   network_configuration {
-    # Vos sous-réseaux (conservés tels quels)
     subnets = [
       "subnet-03ac2adb51071d022",
       "subnet-04274dee3c914f032",
       "subnet-04ac053b02c2936d8"
     ]
-    
-    # [CORRECTION] On utilise l'ID du security group créé par Terraform
     security_groups  = [aws_security_group.app_sg.id]
-    
     assign_public_ip = true
   }
+
+  depends_on = [aws_lb_listener.front_listener]
+}
+
+# --- 8. OUTPUTS ---
+output "alb_url" {
+  value = aws_lb.main.dns_name
+  description = "L'URL fixe de votre application"
 }
