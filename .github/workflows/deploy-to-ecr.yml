@@ -28,6 +28,24 @@ jobs:
         with:
           python-version: '3.9'
 
+      - name: Run Unit Tests
+        run: |
+          echo "Installation des dépendances de test..."
+          pip install pytest httpx
+          
+          # Installation des libs nécessaires pour que les imports marchent
+          # (On installe juste le minimum pour les tests API/Frontend)
+          pip install fastapi uvicorn pydantic supabase
+          
+          echo "Running API Tests..."
+          pytest api/tests/
+          
+          # Pour le ML, c'est plus compliqué car il faut Tensorflow (lourd).
+          # On peut ignorer cette étape en CI si ça prend trop de temps, 
+          # ou utiliser les mocks comme fait dans test_ml.py qui n'importe pas vraiment TF.
+          echo "Running ML API Tests..."
+          pytest ml/tests/
+
       # 3. Téléchargement des Modèles (Crucial avant le build Docker)
       # Le script utilise urllib (natif), donc pas besoin de 'pip install requests'
       - name: Download ML Models

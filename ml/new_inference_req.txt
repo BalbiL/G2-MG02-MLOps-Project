@@ -7,3 +7,5 @@ fastapi
 uvicorn
 tf-keras
 supabase
+pytest
+httpx

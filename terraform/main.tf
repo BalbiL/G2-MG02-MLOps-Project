@@ -134,12 +134,19 @@ resource "aws_ecs_task_definition" "app" {
   task_role_arn            = data.aws_iam_role.execution_role.arn
 
   container_definitions = jsonencode([
-    # --- CONTENEUR ML ---
+# --- CONTENEUR ML ---
     {
       name      = "g2-mg02-ml-container"
       image     = "073184925698.dkr.ecr.eu-west-3.amazonaws.com/g2-mg02-news-reco-ml:latest"
       essential = true
       portMappings = [{ containerPort = 9000, hostPort = 9000, protocol = "tcp" }]
+      
+     
+      environment = [
+        { name = "SUPABASE_URL", value = var.supabase_url },
+        { name = "SUPABASE_KEY", value = var.supabase_key }
+      ]
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
