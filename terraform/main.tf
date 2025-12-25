@@ -160,8 +160,8 @@ resource "aws_ecs_task_definition" "app" {
       environment = [
         { name = "MODEL_HOST", value = "localhost" },
         { name = "MODEL_PORT", value = "9000" },
-        { name = "SUPABASE_URL", value = "https://fnjaisjmtykolnojtafy.supabase.co" },
-        { name = "SUPABASE_KEY", value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuamFpc2ptdHlrb2xub2p0YWZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzIyNDUyOSwiZXhwIjoyMDc4ODAwNTI5fQ.uPTugqsELADLJvZ0dHaUrhvS2SK48FJJxBlgsJ8_9qo" }
+        { name = "SUPABASE_URL", value = var.supabase_url},
+        { name = "SUPABASE_KEY", value = var.supabase_key }
       ]
       dependsOn = [{ containerName = "g2-mg02-ml-container", condition = "START" }]
       logConfiguration = {

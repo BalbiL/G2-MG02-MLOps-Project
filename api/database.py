@@ -5,11 +5,11 @@ from supabase import create_client, Client
 # This file contains the data for the supabase connection
 # -----------------------------
 
-SUPABASE_URL = "https://fnjaisjmtykolnojtafy.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuamFpc2ptdHlrb2xub2p0YWZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzIyNDUyOSwiZXhwIjoyMDc4ODAwNTI5fQ.uPTugqsELADLJvZ0dHaUrhvS2SK48FJJxBlgsJ8_9qo"
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("Supabase credentials not found in environment variables")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
 admin = supabase.auth.admin
