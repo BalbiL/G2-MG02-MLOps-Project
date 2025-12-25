@@ -7,7 +7,7 @@ on:
 
 env:
   AWS_REGION: eu-west-3               # Votre région (Paris)
-  # Noms de vos repositories ECR (à créer sur AWS avant de lancer)
+  # Noms de vos repositories ECR
   ECR_REPO_ML: g2-mg02-news-reco-ml
   ECR_REPO_API: g2-mg02-news-reco-api
   ECR_REPO_FRONTEND: g2-mg02-news-reco-frontend
@@ -22,47 +22,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Installation de Python (pour lancer votre script de download)
+      # 2. Installation de Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
+      # [TESTS] Configuration corrigée avec PYTHONPATH et __init__.py
       - name: Run Unit Tests
+        env:
+          PYTHONPATH: .  # Indispensable pour que les tests trouvent les modules 'api' et 'ml'
         run: |
           echo "Installation des dépendances de test..."
           pip install pytest httpx
           
-          # Installation des libs nécessaires pour que les imports marchent
-          # (On installe juste le minimum pour les tests API/Frontend)
+          # Installation des libs nécessaires pour que les imports Python fonctionnent
           pip install fastapi uvicorn pydantic supabase
           
           echo "Running API Tests..."
-          pytest api/tests/
+          python -m pytest api/tests/
           
-          # Pour le ML, c'est plus compliqué car il faut Tensorflow (lourd).
-          # On peut ignorer cette étape en CI si ça prend trop de temps, 
-          # ou utiliser les mocks comme fait dans test_ml.py qui n'importe pas vraiment TF.
           echo "Running ML API Tests..."
-          pytest ml/tests/
+          # Fonctionne car vous avez ajouté __init__.py et mocké tensorflow dans test_ml.py
+          python -m pytest ml/tests/
 
-      # 3. Téléchargement des Modèles (Crucial avant le build Docker)
-      # Le script utilise urllib (natif), donc pas besoin de 'pip install requests'
+      # 3. Téléchargement des Modèles
       - name: Download ML Models
         run: |
           python download-models.py
-          # Vérification que les fichiers sont bien là (pour le debug)
+          # Vérification (debug)
           ls -R ml/models/
 
-      # 4. Connexion à AWS (Nécessaire pour le push ECR)
-      # N'oubliez pas de mettre à jour vos secrets GitHub si votre token a changé !
+      # 4. Connexion à AWS (Avec clés IAM fixes)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          # aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -73,7 +70,6 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          # Le contexte est '.' (racine) pour pouvoir copier api_config.py si besoin
           docker build -t $ECR_REGISTRY/$ECR_REPO_ML:latest -f ml/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPO_ML:latest
 
