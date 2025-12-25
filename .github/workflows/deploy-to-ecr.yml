@@ -43,7 +43,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          # aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -74,3 +74,8 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPO_FRONTEND:latest -f frontend/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPO_FRONTEND:latest
+
+      # 8. Déploiement sur ECS (Force Update)
+      - name: Force ECS Deployment
+        run: |
+          aws ecs update-service --cluster g2-mg02-news-reco-cluster --service g2-mg02-news-reco-task-service-nyvdt5tq --force-new-deployment --region eu-west-3
