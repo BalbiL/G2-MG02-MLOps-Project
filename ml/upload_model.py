@@ -2,7 +2,7 @@ import os
 import boto3
 
 # Configuration
-BUCKET_NAME = "s3-g2mg02"  # Remplacez par votre vrai nom de bucket S3 !
+BUCKET_NAME = "s3-g2-mg02-testing2"  # Remplacez par votre vrai nom de bucket S3 !
 ARTIFACTS_DIR = "artifacts"
 
 def upload_artifacts():

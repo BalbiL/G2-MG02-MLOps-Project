@@ -16,7 +16,7 @@ MAX_HISTORY_LENGTH = 30
 MAX_TOKENS = 20000          
 TITLE_VEC_DIM = 100         
 BATCH_SIZE = 128
-EPOCHS = 3                  
+EPOCHS = 1                  
 LEARNING_RATE = 0.1         
 
 # --- 2. TÉLÉCHARGEMENT & PRÉPARATION ---
