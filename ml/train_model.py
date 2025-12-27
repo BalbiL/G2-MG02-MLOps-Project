@@ -9,15 +9,17 @@ import tensorflow_recommenders as tfrs
 from tensorflow.keras.layers import StringLookup, TextVectorization, Embedding, GRU, Dense
 import gdown
 
-# --- 1. CONFIGURATION EXACTE DU NOTEBOOK ---
-SAMPLE_SIZE = 200000        
-EMBEDDING_DIM = 64          
-MAX_HISTORY_LENGTH = 30     
+# --- 1. CONFIGURATION EXACTE DU NOTEBOOK (RecSys_One_vs_All.ipynb) ---
+SAMPLE_SIZE = 200000        # Cellule 19
+EMBEDDING_DIM = 64          # Cellule 22
+MAX_HISTORY_LENGTH = 10     # Cellule 22 (Important: réduit de 30 à 10)
+BATCH_SIZE = 128            # Cellule 22
+EPOCHS = 1                 # Cellule 31 (Augmenté de 3 à 10)
+LEARNING_RATE = 0.001       # Cellule 31 (1e-3, différent de Adagrad 0.1)
+
+# Paramètres spécifiques à l'architecture "Light" (non présents dans le notebook SBERT mais nécessaires ici)
 MAX_TOKENS = 20000          
-TITLE_VEC_DIM = 100         
-BATCH_SIZE = 128
-EPOCHS = 1                  
-LEARNING_RATE = 0.1         
+TITLE_VEC_DIM = 20          
 
 # --- 2. TÉLÉCHARGEMENT & PRÉPARATION ---
 def prepare_data():
@@ -45,7 +47,7 @@ def prepare_data():
     beh_cols = ["imp_id", "user_id", "time", "history", "impressions"]
     behaviors = pd.read_csv("mind_large/behaviors_train.tsv", sep="\t", names=beh_cols)
     
-    # Filtrage strict (Logique notebook)
+    # Filtrage strict 
     behaviors["history"] = behaviors["history"].fillna("")
     mask = (
         (behaviors["impressions"].str.contains("-1")) & 
@@ -53,7 +55,7 @@ def prepare_data():
     )
     behaviors = behaviors[mask]
     
-    # Sampling respectueux
+    # Sampling respectueux de la config
     if len(behaviors) > SAMPLE_SIZE:
         behaviors = behaviors.sample(n=SAMPLE_SIZE, random_state=42)
         
@@ -69,7 +71,10 @@ def prepare_data():
     
     print("    -> Génération des paires d'entraînement...")
     for _, row in behaviors.iterrows():
-        hist = row["history"].split()
+        # On ne prend que les X derniers articles pour matcher MAX_HISTORY_LENGTH
+        hist_full = row["history"].split()
+        hist = hist_full[-MAX_HISTORY_LENGTH:] # Truncate history here
+        
         imps = [x for x in row["impressions"].split() if x.endswith("-1")]
         
         for imp in imps:
@@ -92,7 +97,7 @@ def prepare_data():
     
     return dataset, news, all_news_ids, all_categories
 
-# --- 3. ARCHITECTURE EXACTE DU NOTEBOOK ---
+# --- 3. ARCHITECTURE MODEL ---
 
 class NewsModel(tf.keras.Model):
     def __init__(self, all_news_ids, all_categories):
@@ -131,7 +136,9 @@ class UserModel(tf.keras.Model):
         self.gru = GRU(EMBEDDING_DIM)
 
     def call(self, inputs):
-        inputs = inputs[:, -MAX_HISTORY_LENGTH:]
+        # inputs est un RaggedTensor, on le densifie avec padding pour le GRU
+        # On s'assure de ne garder que les MAX_HISTORY_LENGTH derniers items
+        # Note: Le slicing est déjà fait dans prepare_data, mais double sécurité ici
         ids = self.news_id_lookup(inputs)
         embedded_history = self.news_id_embedding_model(ids)
         return self.gru(embedded_history)
@@ -173,21 +180,23 @@ def main():
     })
     
     model = MINDRetrievalModel(user_tower, news_tower, candidates_ds)
-    model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=LEARNING_RATE))
     
-    print(">>> [4/5] Démarrage de l'entraînement...")
+    # CONFIGURATION OPTIMISEUR EXACTE DU NOTEBOOK (Cellule 32)
+    # Adam avec learning rate 0.001
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE))
+    
+    print(f">>> [4/5] Démarrage de l'entraînement ({EPOCHS} epochs)...")
     model.fit(train_ds, epochs=EPOCHS)
     
     print(">>> [5/5] Sauvegarde LOCALE des Artefacts...")
     output_dir = "artifacts"
     
-    # Nettoyage et Création propre des dossiers (FIX DU BUG ICI)
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(f"{output_dir}/models", exist_ok=True)
-    os.makedirs(f"{output_dir}/embeddings", exist_ok=True) # <-- C'est cette ligne qui manquait !
+    os.makedirs(f"{output_dir}/embeddings", exist_ok=True)
     
-    # 1. Index (SavedModel)
+    # 1. Index
     index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)
     index.index_from_dataset(
         tf.data.Dataset.zip((
@@ -198,21 +207,21 @@ def main():
     _ = index(np.array([["N1"]])) 
     tf.saved_model.save(index, f"{output_dir}/models/news_index")
     
-    # 2. Embeddings (.npy)
+    # 2. Embeddings
     print("    -> Génération des embeddings statiques...")
     all_embeddings = []
+    # Batch size plus grand pour l'inférence rapide
     for batch in candidates_ds.batch(512):
         emb = model.news_model(batch)
         all_embeddings.append(emb.numpy())
     
     all_embeddings = np.vstack(all_embeddings)
-    # Maintenant le dossier existe, donc plus d'erreur !
     np.save(f"{output_dir}/embeddings/news_embeddings.npy", all_embeddings)
     
     with open(f"{output_dir}/embeddings/news_ids.json", "w") as f:
         json.dump(news_df["id"].values.tolist(), f)
 
-    print(f">>> Terminé. Tout est dans le dossier '{output_dir}'.")
+    print(f">>> Terminé. Artefacts prêts dans '{output_dir}'.")
 
 if __name__ == "__main__":
     main()
