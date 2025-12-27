@@ -39,7 +39,7 @@ def upload_artifacts():
                 print(f"ERREUR sur {s3_key}: {e}")
                 raise e 
 
-    print(f">>> Succès ! {files_count} fichiers uploadés sur {BUCKET_NAME}.")
+    print(f">>> Succès caca prout ! {files_count} fichiers uploadés sur {BUCKET_NAME}.")
 
 if __name__ == "__main__":
     upload_artifacts()
