@@ -1,37 +1,62 @@
 name: Model Training Pipeline (EC2)
 
 on:
-  workflow_dispatch: # Lancement manuel uniquement
+  workflow_dispatch:
 
 jobs:
-  train-on-ec2:
-    name: Train Model on Self-Hosted Runner
-    # C'EST ICI QUE LA MAGIE OPÈRE :
-    runs-on: self-hosted  
+  # JOB 1 : Entraînement
+  train-model:
+    name: 1. Train Model (EC2)
+    runs-on: self-hosted
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Pas besoin de "Set up Python" complexe, on utilise celui de la machine
-      # Mais on s'assure d'avoir pip
-      
       - name: Install Dependencies
         run: |
-          # On installe les requirements. 
-          # Note: Sur une machine self-hosted, on peut aussi utiliser un env virtuel
           pip3 install -r ml/model_requirements.txt
-          pip3 install boto3 gdown
+          pip3 install gdown
 
-      # Configuration AWS :
-      # Si l'instance EC2 a un IAM Role, ces étapes sont optionnelles !
-      # Mais pour la sécurité, on peut injecter les secrets si besoin.
-      # Ici on suppose que l'IAM Role de l'EC2 gère l'accès S3 (Best Practice).
-      
       - name: Run Training Script
-        env:
-          # On passe les variables si nécessaire, sinon le script a les constantes
-          AWS_DEFAULT_REGION: eu-west-3
         run: |
-          echo "Démarrage de l'entraînement sur la machine EC2..."
           python3 ml/train_model.py
+      
+      # Sauvegarde des résultats pour le job suivant
+      - name: Upload Artifacts to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model-artifacts
+          path: artifacts/
+          retention-days: 1
+
+  # JOB 2 : Upload S3
+  upload-s3:
+    name: 2. Upload to S3
+    runs-on: self-hosted
+    needs: train-model  # Attend que le job 1 soit fini
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Récupération des résultats du job 1
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model-artifacts
+          path: artifacts/
+
+      - name: Install Upload Dependencies
+        run: pip3 install boto3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Run Upload Script
+        run: |
+          python3 ml/upload_model.py
