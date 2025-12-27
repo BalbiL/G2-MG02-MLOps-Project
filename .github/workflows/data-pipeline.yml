@@ -9,30 +9,27 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # 1. Récupération du code
+      # Récupération du code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Installation de Python
+      # Installation de Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # 3. Installation des dépendances spécifiques à la Data
+      # Installation des dépendances spécifiques au module data
       - name: Install Data Dependencies
         run: |
           pip install -r data/data_requirements.txt
 
-      # 4. Exécution du Pipeline
-      # On injecte les secrets Supabase ici
+      # Exécution du Pipeline
       - name: Run ETL Script
         env:
-          # On réutilise les mêmes secrets que pour le déploiement
-          # Assurez-vous que la clé a les droits d'écriture (Service Role)
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }} 
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          # Important : PYTHONPATH pour que les imports entre fichiers fonctionnent
+          # PYTHONPATH pour que les imports entre fichiers fonctionnent
           PYTHONPATH: .
         run: |
           python data/data_pipeline.py

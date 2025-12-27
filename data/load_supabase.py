@@ -16,17 +16,16 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def load_data_safely(df: pd.DataFrame, table_name="news"):
-    print(f"--- Étape Load (Sécurisée) ---")
+    print(f"--- Étape Load ---")
     
-    # 1. SAFETY CHECK : On vérifie si la table contient déjà des données
+    # On vérifie si la table contient déjà des données
     try:
-        # On demande le count exact sans récupérer les données (head=True)
+        # On demande le count exact sans récupérer les données
         response = supabase.table(table_name).select("*", count="exact", head=True).execute()
         existing_count = response.count
         print(f"Nombre d'articles actuels dans la table '{table_name}' : {existing_count}")
         
-        # SEUIL DE SÉCURITÉ : Si plus de 100 articles, on considère que c'est déjà fait.
-        # Le dataset MIND contient > 100k lignes, donc 100 est une marge sûre.
+        # SEUIL DE SÉCURITÉ : Si plus de 100 articles, on considère que c'est déjà fait (évite de repeupler la table deja peuplée)
         if existing_count > 100:
             print(" La table est déjà peuplée. Aucune action requise.")
             print(">> Le script s'arrête ici pour protéger les données existantes.")
@@ -36,15 +35,14 @@ def load_data_safely(df: pd.DataFrame, table_name="news"):
         print(f"Erreur lors de la vérification de la table : {e}")
         return
 
-    # 2. Insertion (Logique notebook cell 59)
+    # Insertion
     print("Table vide détectée. Lancement de l'insertion...")
     
-    # Préparation des headers comme dans le notebook
+    # Préparation des headers
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
-        # Optionnel : header pour ignorer les erreurs de doublons si besoin
         "Prefer": "resolution=ignore-duplicates" 
     }
     
@@ -59,7 +57,7 @@ def load_data_safely(df: pd.DataFrame, table_name="news"):
     for i in tqdm(range(0, len(records), batch_size)):
         batch = records[i : i + batch_size]
         try:
-            # POST via requests comme dans le notebook
+            # POST via requests
             response = requests.post(url, headers=headers, data=json.dumps(batch))
             
             if response.status_code not in (200, 201):

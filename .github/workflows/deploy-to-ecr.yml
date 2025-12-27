@@ -6,8 +6,8 @@ on:
       - deployment_version
 
 env:
-  AWS_REGION: eu-west-3               # Votre région (Paris)
-  # Noms de vos repositories ECR
+  AWS_REGION: eu-west-3         
+  # Noms des repositories ECR
   ECR_REPO_ML: g2-mg02-news-reco-ml
   ECR_REPO_API: g2-mg02-news-reco-api
   ECR_REPO_FRONTEND: g2-mg02-news-reco-frontend
@@ -18,45 +18,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Récupération du code
+      # Récupération du code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Installation de Python
+      # Installation de Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # [TESTS]
+      # tests unitaires
       - name: Run Unit Tests
         env:
           PYTHONPATH: .
-          # Variables bidon pour passer la validation au démarrage
+          #  dummy variables pour passer la validation au démarrage
           SUPABASE_URL: "https://test.supabase.co"
           SUPABASE_KEY: "dummy-key-for-tests"
         run: |
           echo "Installation des dépendances de test..."
           pip install pytest httpx
           
-          # [CORRECTION] Ajout de 'pydantic[email]' pour corriger l'erreur de validation d'email
           pip install fastapi uvicorn "pydantic[email]" supabase
           
           echo "Running API Tests..."
           python -m pytest api/tests/
           
           echo "Running ML API Tests..."
-          # Si vous n'avez pas installé tensorflow ici, ce test risque d'échouer plus loin.
-          # Si c'est le cas, commentez la ligne suivante.
+          
           python -m pytest ml/tests/
 
-      # 3. Téléchargement des Modèles
+      # Téléchargement des fichiers du modèle
       - name: Download ML Models
         run: |
           python download-models.py
           ls -R ml/models/
 
-      # 4. Connexion à AWS (Avec clés IAM fixes)
+      # Connexion à AWS 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -68,7 +66,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      # 5. Build & Push - Service ML
+      # Build & Push - Service ML
       - name: Build and push ML image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -76,7 +74,7 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPO_ML:latest -f ml/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPO_ML:latest
 
-      # 6. Build & Push - Service API
+      # Build & Push - Service API pour supabase
       - name: Build and push API image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -84,7 +82,7 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPO_API:latest -f api/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPO_API:latest
 
-      # 7. Build & Push - Service Frontend
+      # Build & Push - Service Frontend
       - name: Build and push Frontend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -92,7 +90,7 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPO_FRONTEND:latest -f frontend/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPO_FRONTEND:latest
 
-      # 8. Déploiement sur ECS (Force Update)
+      # Déploiement sur ECS (Force Update)
       - name: Force ECS Deployment
         run: |
           aws ecs update-service --cluster g2-mg02-news-reco-cluster --service g2-mg02-news-reco-task-service-nyvdt5tq --force-new-deployment --region eu-west-3

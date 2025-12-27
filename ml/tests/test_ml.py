@@ -6,7 +6,7 @@ import os
 # Hack pour importer model_api qui est dans le dossier parent
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# On doit mocker les imports lourds (tensorflow) AVANT d'importer l'app
+# On doit mocker les imports lourds (tensorflow) avant d'importer l'app
 from unittest.mock import MagicMock
 sys.modules["new_inference"] = MagicMock()
 sys.modules["database_connection"] = MagicMock()

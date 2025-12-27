@@ -7,7 +7,7 @@ def run_pipeline():
     print("   DÉMARRAGE DU DATA PIPELINE MIND")
     print("==========================================")
     
-    # 1. EXTRACT
+    # EXTRACT
     print("\n[1/3] EXTRACT")
     try:
         download_and_extract(output_dir="data/raw")
@@ -15,7 +15,7 @@ def run_pipeline():
         print(f"Erreur lors du téléchargement : {e}")
         return
 
-    # 2. TRANSFORM
+    # TRANSFORM
     print("\n[2/3] TRANSFORM")
     try:
         # Le script s'attend à trouver les données dans data/raw/mind_large
@@ -24,7 +24,7 @@ def run_pipeline():
         print(f"Erreur lors du nettoyage : {e}")
         return
 
-    # 3. LOAD
+    # LOAD
     print("\n[3/3] LOAD")
     try:
         # La fonction contient la sécurité (arrête si count > 100)

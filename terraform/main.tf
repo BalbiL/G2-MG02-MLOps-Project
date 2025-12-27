@@ -2,7 +2,7 @@ provider "aws" {
   region = "eu-west-3"
 }
 
-# --- 1. RÉCUPÉRATION DES RESSOURCES EXISTANTES ---
+# --- RÉCUPÉRATION DES RESSOURCES EXISTANTES ---
 
 data "aws_iam_role" "execution_role" {
   name = "ecsTaskExecutionRole"
@@ -12,26 +12,26 @@ data "aws_vpc" "default" {
   default = true
 }
 
-# --- 2. CLUSTER ECS ---
+# --- CLUSTER ECS ---
 resource "aws_ecs_cluster" "main" {
   name = "g2-mg02-news-reco-cluster"
 }
 
-# --- 3. GESTION DES LOGS (CloudWatch) ---
+# --- GESTION DES LOGS (CloudWatch) ---
 resource "aws_cloudwatch_log_group" "ecs_logs" {
   name              = "/ecs/g2-mg02-news-reco-task"
   retention_in_days = 1
 }
 
-# --- 4. SÉCURITÉ (Security Groups) ---
+# --- SÉCURITÉ (Security Groups) ---
 
-# Groupe de sécurité pour l'ALB (Lui doit être accessible sur le port 80 public)
+# Groupe de sécurité pour l'ALB ( accessible sur le port 80 public)
 resource "aws_security_group" "alb_sg" {
   name        = "g2-mg02-alb-sg"
   description = "Security Group for Application Load Balancer"
   vpc_id      = data.aws_vpc.default.id
 
-  # Entrée : HTTP (80) ouvert à tous
+  # Entrée : HTTP ouvert à tous
   ingress {
     from_port   = 80
     to_port     = 80
@@ -55,8 +55,6 @@ resource "aws_security_group" "app_sg" {
   vpc_id      = data.aws_vpc.default.id
 
   # Autoriser Streamlit (8501) 
-  # (Idéalement on restreindrait à "security_groups = [aws_security_group.alb_sg.id]", 
-  # mais pour le debug on laisse 0.0.0.0/0)
   ingress {
     from_port   = 8501
     to_port     = 8501
@@ -80,7 +78,7 @@ resource "aws_security_group" "app_sg" {
   }
 }
 
-# --- [NOUVEAU] 5. LOAD BALANCER (ALB) ---
+# --- LOAD BALANCER (ALB) ---
 
 resource "aws_lb" "main" {
   name               = "g2-mg02-news-reco-alb"
@@ -122,7 +120,7 @@ resource "aws_lb_listener" "front_listener" {
   }
 }
 
-# --- 6. TASK DEFINITION ---
+# --- TASK DEFINITION ---
 resource "aws_ecs_task_definition" "app" {
   family                   = "g2-mg02-news-reco-task"
   network_mode             = "awsvpc"
@@ -208,7 +206,7 @@ resource "aws_ecs_task_definition" "app" {
   ])
 }
 
-# --- 7. SERVICE ECS (Mis à jour) ---
+# --- SERVICE ECS (Mis à jour) ---
 resource "aws_ecs_service" "app_service" {
   name            = "g2-mg02-news-reco-task-service-nyvdt5tq"
   cluster         = aws_ecs_cluster.main.id
@@ -216,7 +214,7 @@ resource "aws_ecs_service" "app_service" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
-  # [NOUVEAU] Connexion au Load Balancer
+  # Connexion au Load Balancer
   load_balancer {
     target_group_arn = aws_lb_target_group.front_tg.arn
     container_name   = "g2-mg02-frontend-container"
@@ -236,8 +234,8 @@ resource "aws_ecs_service" "app_service" {
   depends_on = [aws_lb_listener.front_listener]
 }
 
-# --- 8. OUTPUTS ---
+# --- OUTPUTS ---
 output "alb_url" {
   value = aws_lb.main.dns_name
-  description = "L'URL fixe de votre application"
+  description = "L'URL fixe de l'application"
 }

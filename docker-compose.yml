@@ -8,14 +8,12 @@ services:
     ports:
       - "9000:9000"
     
-    # 🟢 AJOUT DU HEALTHCHECK
-    # Docker va exécuter cette commande régulièrement.
-    # Tant qu'elle échoue (le modèle charge), le statut est "unhealthy".
+    #  HEALTHCHECK
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
       interval: 10s       # Réessaie toutes les 10 secondes
       timeout: 5s         # Timeout de la requête
-      retries: 10         # Nombre d'essais avant de déclarer l'échec (ici on laisse ~100s au modèle pour charger)
+      retries: 10         # Nombre d'essais avant de déclarer l'échec
       start_period: 30s   # Temps de grâce au démarrage avant de commencer à tester
 
   # --- Service API (Backend) ---
@@ -33,7 +31,7 @@ services:
       - SUPABASE_KEY=${SUPABASE_KEY}
     depends_on:
       ml-service:
-        condition: service_healthy  # ⚠️ On attend que le ML soit "Healthy" (et pas juste "Started")
+        condition: service_healthy  # On attend que le ML soit "Healthy"
 
   # --- Service Frontend (Streamlit) ---
   frontend-service:
@@ -49,7 +47,6 @@ services:
       - MODEL_HOST=ml-service
       - MODEL_PORT=9000
     depends_on:
-      # ⚠️ SYNTAXE CORRIGÉE (Format dictionnaire, pas de tirets)
       api-service:
         condition: service_started
       ml-service:

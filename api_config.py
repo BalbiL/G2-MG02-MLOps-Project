@@ -1,6 +1,6 @@
 import os
 
-# Par défaut 'localhost' pour vos tests unitaires, mais surchargeable par Docker
+# Configuration des liens pour les différentes API
 API_HOST = os.getenv("API_HOST", "localhost")
 MODEL_HOST = os.getenv("MODEL_HOST", "localhost")
 API_PORT = os.getenv("API_PORT", "8000")
