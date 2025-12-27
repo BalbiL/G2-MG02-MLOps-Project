@@ -1,0 +1,37 @@
+name: Model Training Pipeline (EC2)
+
+on:
+  workflow_dispatch: # Lancement manuel uniquement
+
+jobs:
+  train-on-ec2:
+    name: Train Model on Self-Hosted Runner
+    # C'EST ICI QUE LA MAGIE OPÈRE :
+    runs-on: self-hosted  
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Pas besoin de "Set up Python" complexe, on utilise celui de la machine
+      # Mais on s'assure d'avoir pip
+      
+      - name: Install Dependencies
+        run: |
+          # On installe les requirements. 
+          # Note: Sur une machine self-hosted, on peut aussi utiliser un env virtuel
+          pip3 install -r ml/model_requirements.txt
+          pip3 install boto3 gdown
+
+      # Configuration AWS :
+      # Si l'instance EC2 a un IAM Role, ces étapes sont optionnelles !
+      # Mais pour la sécurité, on peut injecter les secrets si besoin.
+      # Ici on suppose que l'IAM Role de l'EC2 gère l'accès S3 (Best Practice).
+      
+      - name: Run Training Script
+        env:
+          # On passe les variables si nécessaire, sinon le script a les constantes
+          AWS_DEFAULT_REGION: eu-west-3
+        run: |
+          echo "Démarrage de l'entraînement sur la machine EC2..."
+          python3 ml/train_model.py
