@@ -6,222 +6,248 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import tensorflow_recommenders as tfrs
-from tensorflow.keras.layers import StringLookup, TextVectorization, Embedding, GRU, Dense
+from tensorflow.keras.layers import StringLookup, Embedding, GRU, Dense
+from sentence_transformers import SentenceTransformer # Nouvelle dépendance
 import gdown
 
-# --- 1. CONFIGURATION EXACTE DU NOTEBOOK (RecSys_One_vs_All.ipynb) ---
-SAMPLE_SIZE = 200000        # Cellule 19
-EMBEDDING_DIM = 64          # Cellule 22
-MAX_HISTORY_LENGTH = 10     # Cellule 22 (Important: réduit de 30 à 10)
-BATCH_SIZE = 128            # Cellule 22
-EPOCHS = 1                 # Cellule 31 (Augmenté de 3 à 10)
-LEARNING_RATE = 0.001       # Cellule 31 (1e-3, différent de Adagrad 0.1)
+# --- CONFIGURATION ---
+SAMPLE_SIZE = 200000        # Nombre d'interactions utilisateurs
+BATCH_SIZE = 128
+EPOCHS = 10                 # Comme dans le notebook
+LEARNING_RATE = 1e-3        # Adam 0.001
+MAX_HISTORY_LENGTH = 10     
+SBERT_MODEL = "all-MiniLM-L6-v2" # Le modèle exact utilisé par le collègue
 
-# Paramètres spécifiques à l'architecture "Light" (non présents dans le notebook SBERT mais nécessaires ici)
-MAX_TOKENS = 20000          
-TITLE_VEC_DIM = 20          
-
-# --- 2. TÉLÉCHARGEMENT & PRÉPARATION ---
+# --- 1. TÉLÉCHARGEMENT & DATA ---
 def prepare_data():
-    print(">>> [1/5] Téléchargement des données...")
+    print(">>> [1/6] Téléchargement des données...")
     file_id = "1GffOYmcAMP17oi2BwC7Dp4l5F7rEjHRr"
-    url = f"https://drive.google.com/uc?id={file_id}"
     output_zip = "mind_large.zip"
     
     if not os.path.exists(output_zip):
+        url = f"https://drive.google.com/uc?id={file_id}"
         gdown.download(url, output_zip, quiet=False)
         
     if not os.path.exists("mind_large"):
         with zipfile.ZipFile(output_zip, 'r') as z:
             z.extractall(".")
 
-    print(">>> [2/5] Nettoyage et Création du Dataset...")
-    # Chargement News
+    print(">>> [2/6] Chargement Dataframes...")
+    # News
     news_cols = ["id", "category", "subcategory", "title", "abstract", "url", "t_ents", "a_ents"]
     news = pd.read_csv("mind_large/news_train.tsv", sep="\t", names=news_cols)
     news = news.drop_duplicates(subset=["id"])
     news["title"] = news["title"].fillna("No Title")
-    news["category"] = news["category"].fillna("unknown")
     
-    # Chargement Behaviors
+    # Behaviors
     beh_cols = ["imp_id", "user_id", "time", "history", "impressions"]
     behaviors = pd.read_csv("mind_large/behaviors_train.tsv", sep="\t", names=beh_cols)
-    
-    # Filtrage strict 
     behaviors["history"] = behaviors["history"].fillna("")
-    mask = (
-        (behaviors["impressions"].str.contains("-1")) & 
-        (behaviors["history"].str.len() > 0)            
-    )
+    
+    # Filtrage (Garder seulement ce qui a du sens)
+    mask = (behaviors["impressions"].str.contains("-1")) & (behaviors["history"].str.len() > 0)
     behaviors = behaviors[mask]
     
-    # Sampling respectueux de la config
     if len(behaviors) > SAMPLE_SIZE:
         behaviors = behaviors.sample(n=SAMPLE_SIZE, random_state=42)
-        
-    print(f"    -> Entraînement sur {len(behaviors)} sessions utilisateurs.")
 
-    # Parsing
+    # Parsing des historiques
+    print("    -> Création du dataset TensorFlow...")
     histories = []
     candidate_ids = []
-    candidate_cats = []
-    candidate_titles = []
     
-    news_dict = news.set_index("id")[["category", "title"]].to_dict("index")
+    # On garde en mémoire les titres pour l'encodage
+    # L'ordre est crucial : news_id -> title
+    news_id_to_title = dict(zip(news["id"], news["title"]))
     
-    print("    -> Génération des paires d'entraînement...")
     for _, row in behaviors.iterrows():
-        # On ne prend que les X derniers articles pour matcher MAX_HISTORY_LENGTH
         hist_full = row["history"].split()
-        hist = hist_full[-MAX_HISTORY_LENGTH:] # Truncate history here
+        hist = hist_full[-MAX_HISTORY_LENGTH:] # Derniers 10 articles
         
-        imps = [x for x in row["impressions"].split() if x.endswith("-1")]
+        # On récupère les clics positifs
+        imps = [x.split("-")[0] for x in row["impressions"].split() if x.endswith("-1")]
         
-        for imp in imps:
-            news_id = imp.split("-")[0]
-            if news_id in news_dict:
+        for target_id in imps:
+            if target_id in news_id_to_title:
                 histories.append(hist)
-                candidate_ids.append(news_id)
-                candidate_cats.append(news_dict[news_id]["category"])
-                candidate_titles.append(news_dict[news_id]["title"])
+                candidate_ids.append(target_id)
 
-    all_news_ids = news["id"].unique()
-    all_categories = news["category"].unique()
-    
+    # Dataset TF
     dataset = tf.data.Dataset.from_tensor_slices({
         "history": tf.ragged.constant(histories),
-        "news_id": tf.constant(candidate_ids),
-        "category": tf.constant(candidate_cats),
-        "title": tf.constant(candidate_titles)
+        "news_id": tf.constant(candidate_ids)
     }).batch(BATCH_SIZE).cache()
     
-    return dataset, news, all_news_ids, all_categories
+    return dataset, news
 
-# --- 3. ARCHITECTURE MODEL ---
+# --- 2. ENCODAGE SBERT (La partie "Lourde") ---
+def generate_sbert_embeddings(news_df):
+    print(f">>> [3/6] Génération des embeddings SBERT ({SBERT_MODEL})...")
+    print("    Ceci peut prendre quelques minutes...")
+    
+    # On s'assure que l'ordre des IDs dans la matrice correspond à l'ordre du Vocabulaire
+    # Le StringLookup de Keras classe souvent par fréquence ou alphabétique, 
+    # mais pour injecter une matrice, il faut être synchrone.
+    
+    # On définit l'ordre explicite : Tous les IDs uniques du dataset
+    all_news_ids = news_df["id"].unique()
+    
+    # On charge le modèle SBERT
+    encoder = SentenceTransformer(SBERT_MODEL)
+    
+    # On récupère les titres dans le MÊME ORDRE que all_news_ids
+    # Attention : news_df peut ne pas être trié comme on veut
+    id_to_title = dict(zip(news_df["id"], news_df["title"]))
+    titles_ordered = [id_to_title[nid] for nid in all_news_ids]
+    
+    # Encodage
+    embeddings = encoder.encode(titles_ordered, batch_size=128, show_progress_bar=True, convert_to_numpy=True)
+    
+    # Ajout d'une ligne de Zéros pour le padding/OOV (Index 0)
+    padding_row = np.zeros((1, embeddings.shape[1]))
+    final_matrix = np.vstack([padding_row, embeddings])
+    
+    return final_matrix, all_news_ids
+
+# --- 3. MODÈLES EXACTS (Avec injection de matrice) ---
 
 class NewsModel(tf.keras.Model):
-    def __init__(self, all_news_ids, all_categories):
+    def __init__(self, vocab_ids, embedding_matrix):
         super().__init__()
-        self.news_id_lookup = StringLookup(vocabulary=all_news_ids, mask_token=None)
-        self.news_id_embedding = Embedding(len(all_news_ids) + 1, EMBEDDING_DIM)
+        self.vocab_ids = vocab_ids
         
-        self.category_lookup = StringLookup(vocabulary=all_categories, mask_token=None)
-        self.category_embedding = Embedding(len(all_categories) + 1, EMBEDDING_DIM)
+        # A. Lookup ID -> Index entier
+        self.id_lookup = StringLookup(vocabulary=vocab_ids, mask_token=None)
         
-        self.title_vectorizer = TextVectorization(
-            max_tokens=MAX_TOKENS,
-            output_mode="int",
-            output_sequence_length=TITLE_VEC_DIM
+        # B. Matrice Pré-calculée (Figée)
+        # C'est ICI que se trouve le poids du fichier (200MB)
+        self.pretrained_embedding = Embedding(
+            input_dim=embedding_matrix.shape[0],
+            output_dim=embedding_matrix.shape[1],
+            embeddings_initializer=tf.keras.initializers.Constant(embedding_matrix),
+            trainable=False # On ne réentraîne pas le BERT, on l'utilise tel quel
         )
-        self.title_embedding_model = tf.keras.Sequential([
-            Embedding(MAX_TOKENS, EMBEDDING_DIM),
-            tf.keras.layers.GlobalAveragePooling1D()
-        ])
         
-        self.dense = Dense(EMBEDDING_DIM)
+        # C. Projection (Apprentissage)
+        self.dense = Dense(128, activation="relu")
+        self.output_dense = Dense(64) # Sortie finale 64
 
     def call(self, inputs):
-        id_emb = self.news_id_embedding(self.news_id_lookup(inputs["news_id"]))
-        cat_emb = self.category_embedding(self.category_lookup(inputs["category"]))
-        title_emb = self.title_embedding_model(self.title_vectorizer(inputs["title"]))
-        
-        concatenated = tf.concat([id_emb, cat_emb, title_emb], axis=1)
-        return self.dense(concatenated)
+        # inputs = news_id (string)
+        idx = self.id_lookup(inputs)
+        bert_vec = self.pretrained_embedding(idx)
+        x = self.dense(bert_vec)
+        x = self.output_dense(x)
+        return tf.math.l2_normalize(x, axis=1) # Normalisation importante pour le dot product
 
 class UserModel(tf.keras.Model):
-    def __init__(self, news_id_embedding_model, all_news_ids):
+    def __init__(self, news_model):
         super().__init__()
-        self.news_id_lookup = StringLookup(vocabulary=all_news_ids, mask_token=None)
-        self.news_id_embedding_model = news_id_embedding_model
-        self.gru = GRU(EMBEDDING_DIM)
+        self.news_model = news_model # Réutilise la tour News pour encoder l'historique
+        self.gru = GRU(64) # RNN pour la séquence temporelle
 
     def call(self, inputs):
-        # inputs est un RaggedTensor, on le densifie avec padding pour le GRU
-        # On s'assure de ne garder que les MAX_HISTORY_LENGTH derniers items
-        # Note: Le slicing est déjà fait dans prepare_data, mais double sécurité ici
-        ids = self.news_id_lookup(inputs)
-        embedded_history = self.news_id_embedding_model(ids)
-        return self.gru(embedded_history)
+        # inputs = liste d'IDs (historique)
+        # On encode chaque article de l'historique avec le NewsModel
+        # Attention: NewsModel attend des IDs, inputs est un RaggedTensor ou Tensor de strings
+        
+        # Astuce : On utilise directement les sous-couches du NewsModel 
+        # pour éviter de passer par l'appel principal si nécessaire,
+        # mais ici l'architecture Two-Tower standard permet d'appeler news_model sur les items
+        
+        # inputs shape: (batch, seq_len) -> strings
+        idx = self.news_model.id_lookup(inputs)
+        emb = self.news_model.pretrained_embedding(idx) # (batch, seq, 384)
+        x = self.news_model.dense(emb)
+        x = self.news_model.output_dense(x) # (batch, seq, 64)
+        
+        # GRU
+        gru_out = self.gru(x)
+        return tf.math.l2_normalize(gru_out, axis=1)
 
-class MINDRetrievalModel(tfrs.Model):
-    def __init__(self, user_model, news_model, candidate_ds):
+class RetrievalModel(tfrs.Model):
+    def __init__(self, user_model, news_model, candidate_ids):
         super().__init__()
         self.user_model = user_model
         self.news_model = news_model
+        
+        # Dataset de candidats pour la métrique
+        # On crée un dataset tf à partir des IDs pour que la métrique puisse calculer le TopK
+        candidates = tf.data.Dataset.from_tensor_slices(candidate_ids).batch(128).map(self.news_model)
+        
         self.task = tfrs.tasks.Retrieval(
-            metrics=tfrs.metrics.FactorizedTopK(
-                candidates=candidate_ds.batch(128).map(self.news_model)
-            )
+            metrics=tfrs.metrics.FactorizedTopK(candidates=candidates),
+            temperature=0.07 # Paramètre critique vu dans le notebook (contrastive loss)
         )
 
     def compute_loss(self, features, training=False):
         user_emb = self.user_model(features["history"])
-        news_emb = self.news_model({
-            "news_id": features["news_id"],
-            "category": features["category"],
-            "title": features["title"]
-        })
+        news_emb = self.news_model(features["news_id"])
         return self.task(user_emb, news_emb)
 
-# --- 4. EXECUTION PRINCIPALE ---
+# --- 4. EXÉCUTION ---
 def main():
-    train_ds, news_df, vocab_ids, vocab_cats = prepare_data()
+    # A. Data
+    train_ds, news_df = prepare_data()
     
-    print(">>> [3/5] Instanciation du modèle...")
-    news_tower = NewsModel(vocab_ids, vocab_cats)
-    news_tower.title_vectorizer.adapt(news_df["title"].values)
+    # B. SBERT Matrix (Le secret du poids)
+    emb_matrix, vocab_ids = generate_sbert_embeddings(news_df)
+    print(f"    Matrice shape: {emb_matrix.shape} (Doit être ~130k x 384)")
+
+    # C. Modèles
+    print(">>> [4/6] Instanciation et Entraînement...")
+    news_tower = NewsModel(vocab_ids, emb_matrix)
+    user_tower = UserModel(news_tower)
     
-    user_tower = UserModel(news_tower.news_id_embedding, vocab_ids)
-    
-    candidates_ds = tf.data.Dataset.from_tensor_slices({
-        "news_id": news_df["id"].values,
-        "category": news_df["category"].values,
-        "title": news_df["title"].values
-    })
-    
-    model = MINDRetrievalModel(user_tower, news_tower, candidates_ds)
-    
-    # CONFIGURATION OPTIMISEUR EXACTE DU NOTEBOOK (Cellule 32)
-    # Adam avec learning rate 0.001
+    model = RetrievalModel(user_tower, news_tower, vocab_ids)
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE))
     
-    print(f">>> [4/5] Démarrage de l'entraînement ({EPOCHS} epochs)...")
     model.fit(train_ds, epochs=EPOCHS)
     
-    print(">>> [5/5] Sauvegarde LOCALE des Artefacts...")
+    # D. Export
+    print(">>> [5/6] Sauvegarde des Artefacts...")
     output_dir = "artifacts"
-    
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(f"{output_dir}/models", exist_ok=True)
     os.makedirs(f"{output_dir}/embeddings", exist_ok=True)
     
-    # 1. Index
+    # 1. Index (SavedModel)
+    # C'est lui qui va contenir la grosse matrice SBERT dans ses variables
     index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)
+    
+    # On indexe tout le corpus (c'est lourd mais nécessaire pour le fichier final)
+    print("    Construction de l'index BruteForce (peut être long)...")
+    # On passe les IDs bruts au news_model pour qu'il génère les vecteurs
+    news_ids_ds = tf.data.Dataset.from_tensor_slices(vocab_ids).batch(128)
+    
+    # L'astuce : index_from_dataset attend (id, embedding)
+    # On utilise un map pour générer les paires à la volée
     index.index_from_dataset(
-        tf.data.Dataset.zip((
-            candidates_ds.batch(128).map(lambda x: x["news_id"]), 
-            candidates_ds.batch(128).map(model.news_model)        
-        ))
+        news_ids_ds.map(lambda x: (x, model.news_model(x)))
     )
-    _ = index(np.array([["N1"]])) 
+    
+    # Appel dummy pour figer la signature
+    _ = index(tf.constant([["N0"]]))
+    
+    print(f"    Sauvegarde dans {output_dir}/models/news_index ...")
     tf.saved_model.save(index, f"{output_dir}/models/news_index")
     
-    # 2. Embeddings
-    print("    -> Génération des embeddings statiques...")
-    all_embeddings = []
-    # Batch size plus grand pour l'inférence rapide
-    for batch in candidates_ds.batch(512):
+    # 2. Embeddings statiques (Numpy) pour l'API
+    # L'API a besoin des vecteurs finaux (64 dims) pas ceux de BERT (384)
+    print("    Génération des embeddings finaux (.npy)...")
+    final_embeddings = []
+    for batch in news_ids_ds:
         emb = model.news_model(batch)
-        all_embeddings.append(emb.numpy())
+        final_embeddings.append(emb.numpy())
     
-    all_embeddings = np.vstack(all_embeddings)
-    np.save(f"{output_dir}/embeddings/news_embeddings.npy", all_embeddings)
+    final_embeddings = np.vstack(final_embeddings)
+    np.save(f"{output_dir}/embeddings/news_embeddings.npy", final_embeddings)
     
     with open(f"{output_dir}/embeddings/news_ids.json", "w") as f:
-        json.dump(news_df["id"].values.tolist(), f)
+        json.dump(vocab_ids.tolist(), f)
 
-    print(f">>> Terminé. Artefacts prêts dans '{output_dir}'.")
+    print(">>> [6/6] Terminé avec succès.")
 
 if __name__ == "__main__":
     main()

@@ -6,3 +6,4 @@ numpy
 scikit-learn
 boto3
 gdown
+sentence-transformers
