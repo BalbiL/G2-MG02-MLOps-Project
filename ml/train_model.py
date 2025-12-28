@@ -8,7 +8,7 @@ import tensorflow as tf
 import tensorflow_recommenders as tfrs
 from tensorflow.keras.layers import StringLookup, Embedding, GRU, Dense
 from sentence_transformers import SentenceTransformer # Nouvelle dépendance
-import gdown
+import urllib.request
 
 # --- CONFIGURATION ---
 SAMPLE_SIZE = 200000        # Nombre d'interactions utilisateurs
@@ -20,17 +20,33 @@ SBERT_MODEL = "all-MiniLM-L6-v2" # Le modèle exact utilisé par le collègue
 
 # --- 1. TÉLÉCHARGEMENT & DATA ---
 def prepare_data():
-    print(">>> [1/6] Téléchargement des données...")
-    file_id = "1GffOYmcAMP17oi2BwC7Dp4l5F7rEjHRr"
+    print(">>> [1/6] Téléchargement des données depuis S3 (Public)...")
+    
+    # Configuration S3
+    bucket_name = "s3-g2mg02"
+    region = "eu-west-3"
+    file_key = "data/mind_large.zip"
+    url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
     output_zip = "mind_large.zip"
     
+    # Téléchargement
     if not os.path.exists(output_zip):
-        url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, output_zip, quiet=False)
-        
+        try:
+            print(f"    Source : {url}")
+            urllib.request.urlretrieve(url, output_zip)
+            print("    Téléchargement réussi.")
+        except Exception as e:
+            print(f"!!! Erreur de téléchargement : {e}")
+            raise e
+            
     if not os.path.exists("mind_large"):
-        with zipfile.ZipFile(output_zip, 'r') as z:
-            z.extractall(".")
+        print("    Extraction du zip...")
+        try:
+            with zipfile.ZipFile(output_zip, 'r') as z:
+                z.extractall(".")
+        except Exception as e:
+            print(f"!!! Erreur d'extraction : {e}")
+            raise e
 
     print(">>> [2/6] Chargement Dataframes...")
     # News
