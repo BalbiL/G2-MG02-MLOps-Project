@@ -3,7 +3,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 # Configuration
-BUCKET_NAME = "s3-g2-mg02-testing2"
+BUCKET_NAME = "s3-g2-mg02"
 BUCKET_REGION = "eu-west-3"
 BUCKET_ROOT_URL = f"https://{BUCKET_NAME}.s3.{BUCKET_REGION}.amazonaws.com"
 
