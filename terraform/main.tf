@@ -234,6 +234,63 @@ resource "aws_ecs_service" "app_service" {
   depends_on = [aws_lb_listener.front_listener]
 }
 
+
+# --- STOCKAGE S3 EXISTANT (Importé) ---
+
+resource "aws_s3_bucket" "model_bucket" {
+  bucket = "s3-g2mg02"  # Votre nom de bucket exact
+
+  # Sécurité : Empêche Terraform de supprimer ce bucket accidentellement
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# 1. Configuration du Versioning (Activé comme vous l'avez fait)
+resource "aws_s3_bucket_versioning" "model_bucket_versioning" {
+  bucket = aws_s3_bucket.model_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# 2. Configuration de l'accès public (Tout autorisé selon votre demande)
+resource "aws_s3_bucket_public_access_block" "model_bucket_public_access" {
+  bucket = aws_s3_bucket.model_bucket.id
+
+  # On désactive tous les blocages pour autoriser l'accès public
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+# 3. La Politique de sécurité (Votre JSON exact)
+resource "aws_s3_bucket_policy" "model_bucket_policy" {
+  bucket = aws_s3_bucket.model_bucket.id
+
+  # On utilise jsonencode pour insérer votre JSON proprement
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "arn:aws:s3:::s3-g2mg02/*"
+      },
+      {
+        Sid       = "PublicListBucket"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:ListBucket"
+        Resource  = "arn:aws:s3:::s3-g2mg02"
+      }
+    ]
+  })
+}
+
 # --- OUTPUTS ---
 output "alb_url" {
   value = aws_lb.main.dns_name
