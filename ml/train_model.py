@@ -228,7 +228,8 @@ def main():
     )
     
     # Appel dummy pour figer la signature
-    _ = index(tf.constant([["N0"]]))
+    dummy_history = [["N0"] * 10]
+    _ = index(tf.constant(dummy_history))
     
     print(f"    Sauvegarde dans {output_dir}/models/news_index ...")
     tf.saved_model.save(index, f"{output_dir}/models/news_index")
