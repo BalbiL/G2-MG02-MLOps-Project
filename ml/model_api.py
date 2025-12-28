@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Optional
+import traceback
 
 from new_inference import (
     get_session_recommendations,
@@ -76,6 +77,9 @@ def recommend(req: RecommendationRequest):
         }
 
     except Exception as e:
+        print("!!! EXCEPTION DURING INFERENCE !!!")
+        traceback.print_exc() # Affiche toute l'erreur dans les logs serveur
+        print(f"Error message: {str(e)}")
         return {
             "error": str(e),
             "debug": debug_info
