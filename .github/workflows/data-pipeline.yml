@@ -1,6 +1,7 @@
 name: Data Pipeline ETL
 
 on:
+  # Pipeline manuel (pas de declenchement sur push)
   workflow_dispatch:
 
 jobs:
