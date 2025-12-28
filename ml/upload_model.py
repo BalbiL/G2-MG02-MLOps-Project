@@ -4,7 +4,7 @@ import boto3
 # Configuration
 # Note: Le bucket est récupéré via les secrets ou variables d'env idéalement, 
 # sinon modifiez ici pour votre bucket de test
-BUCKET_NAME = "s3-g2-mg02-testing2"  
+BUCKET_NAME = "s3-g2mg02"  
 ARTIFACTS_DIR = "artifacts"
 
 def upload_artifacts():

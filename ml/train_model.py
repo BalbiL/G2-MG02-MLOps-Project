@@ -13,7 +13,7 @@ import gdown
 # --- CONFIGURATION ---
 SAMPLE_SIZE = 200000        # Nombre d'interactions utilisateurs
 BATCH_SIZE = 128
-EPOCHS = 1                 # Comme dans le notebook
+EPOCHS = 10                 # Comme dans le notebook
 LEARNING_RATE = 1e-3        # Adam 0.001
 MAX_HISTORY_LENGTH = 10     
 SBERT_MODEL = "all-MiniLM-L6-v2" # Le modèle exact utilisé par le collègue
