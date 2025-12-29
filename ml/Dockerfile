@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copie de tout le dossier ML vers /app/ml
 COPY ml/ ./ml/
 
-# On change le dossier de travail pour se placer DANS le dossier ml
+# On change le dossier de travail pour se placer dans le dossier ml
 WORKDIR /app/ml
 
 EXPOSE 9000

@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copie du code frontend
 COPY frontend/ ./frontend/
-# Copie du fichier de config partagé (indispensable)
+# Copie du fichier de config partagé 
 COPY api_config.py .
 
 # Streamlit tourne par défaut sur 8501

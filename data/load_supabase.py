@@ -25,7 +25,7 @@ def load_data_safely(df: pd.DataFrame, table_name="news"):
         existing_count = response.count
         print(f"Nombre d'articles actuels dans la table '{table_name}' : {existing_count}")
         
-        # SEUIL DE SÉCURITÉ : Si plus de 100 articles, on considère que c'est déjà fait (évite de repeupler la table deja peuplée)
+        # Si plus de 100 articles, on considère que c'est déjà fait (évite de repeupler la table supabase news deja peuplée)
         if existing_count > 100:
             print(" La table est déjà peuplée. Aucune action requise.")
             print(">> Le script s'arrête ici pour protéger les données existantes.")

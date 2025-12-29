@@ -7,18 +7,18 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_recommenders as tfrs
 from tensorflow.keras.layers import StringLookup, Embedding, GRU, Dense
-from sentence_transformers import SentenceTransformer # Nouvelle dépendance
+from sentence_transformers import SentenceTransformer 
 import urllib.request
 
 # --- CONFIGURATION ---
 SAMPLE_SIZE = 200000        # Nombre d'interactions utilisateurs
 BATCH_SIZE = 128
-EPOCHS = 10                 # Comme dans le notebook
+EPOCHS = 10                 
 LEARNING_RATE = 1e-3        # Adam 0.001
 MAX_HISTORY_LENGTH = 10     
-SBERT_MODEL = "all-MiniLM-L6-v2" # Le modèle exact utilisé par le collègue
+SBERT_MODEL = "all-MiniLM-L6-v2" 
 
-# --- 1. TÉLÉCHARGEMENT & DATA ---
+# --- TÉLÉCHARGEMENT & DATA ---
 def prepare_data():
     print(">>> [1/6] Téléchargement des données depuis S3 (Public)...")
     
@@ -96,14 +96,11 @@ def prepare_data():
     
     return dataset, news
 
-# --- 2. ENCODAGE SBERT (La partie "Lourde") ---
+# --- ENCODAGE SBERT  ---
 def generate_sbert_embeddings(news_df):
     print(f">>> [3/6] Génération des embeddings SBERT ({SBERT_MODEL})...")
     print("    Ceci peut prendre quelques minutes...")
     
-    # On s'assure que l'ordre des IDs dans la matrice correspond à l'ordre du Vocabulaire
-    # Le StringLookup de Keras classe souvent par fréquence ou alphabétique, 
-    # mais pour injecter une matrice, il faut être synchrone.
     
     # On définit l'ordre explicite : Tous les IDs uniques du dataset
     all_news_ids = news_df["id"].unique()
@@ -111,8 +108,7 @@ def generate_sbert_embeddings(news_df):
     # On charge le modèle SBERT
     encoder = SentenceTransformer(SBERT_MODEL)
     
-    # On récupère les titres dans le MÊME ORDRE que all_news_ids
-    # Attention : news_df peut ne pas être trié comme on veut
+    # On récupère les titres dans le meme ordre que all_news_ids
     id_to_title = dict(zip(news_df["id"], news_df["title"]))
     titles_ordered = [id_to_title[nid] for nid in all_news_ids]
     
@@ -125,18 +121,17 @@ def generate_sbert_embeddings(news_df):
     
     return final_matrix, all_news_ids
 
-# --- 3. MODÈLES EXACTS (Avec injection de matrice) ---
+# --- MODÈLES  ---
 
 class NewsModel(tf.keras.Model):
     def __init__(self, vocab_ids, embedding_matrix):
         super().__init__()
         self.vocab_ids = vocab_ids
         
-        # A. Lookup ID -> Index entier
+        # Lookup ID -> Index entier
         self.id_lookup = StringLookup(vocabulary=vocab_ids, mask_token=None)
         
-        # B. Matrice Pré-calculée (Figée)
-        # C'est ICI que se trouve le poids du fichier (200MB)
+        # Matrice Pré-calculée
         self.pretrained_embedding = Embedding(
             input_dim=embedding_matrix.shape[0],
             output_dim=embedding_matrix.shape[1],
@@ -144,7 +139,7 @@ class NewsModel(tf.keras.Model):
             trainable=False # On ne réentraîne pas le BERT, on l'utilise tel quel
         )
         
-        # C. Projection (Apprentissage)
+        # Projection
         self.dense = Dense(128, activation="relu")
         self.output_dense = Dense(64) # Sortie finale 64
 
@@ -163,13 +158,6 @@ class UserModel(tf.keras.Model):
         self.gru = GRU(64) # RNN pour la séquence temporelle
 
     def call(self, inputs):
-        # inputs = liste d'IDs (historique)
-        # On encode chaque article de l'historique avec le NewsModel
-        # Attention: NewsModel attend des IDs, inputs est un RaggedTensor ou Tensor de strings
-        
-        # Astuce : On utilise directement les sous-couches du NewsModel 
-        # pour éviter de passer par l'appel principal si nécessaire,
-        # mais ici l'architecture Two-Tower standard permet d'appeler news_model sur les items
         
         # inputs shape: (batch, seq_len) -> strings
         idx = self.news_model.id_lookup(inputs)
@@ -193,7 +181,7 @@ class RetrievalModel(tfrs.Model):
         
         self.task = tfrs.tasks.Retrieval(
             metrics=tfrs.metrics.FactorizedTopK(candidates=candidates),
-            temperature=0.07 # Paramètre critique vu dans le notebook (contrastive loss)
+            temperature=0.07 # Paramètre critique vu dans le notebook 
         )
 
     def compute_loss(self, features, training=False):
@@ -201,16 +189,16 @@ class RetrievalModel(tfrs.Model):
         news_emb = self.news_model(features["news_id"])
         return self.task(user_emb, news_emb)
 
-# --- 4. EXÉCUTION ---
+# --- EXÉCUTION ---
 def main():
-    # A. Data
+    # Data
     train_ds, news_df = prepare_data()
     
-    # B. SBERT Matrix (Le secret du poids)
+    # SBERT Matrix 
     emb_matrix, vocab_ids = generate_sbert_embeddings(news_df)
     print(f"    Matrice shape: {emb_matrix.shape} (Doit être ~130k x 384)")
 
-    # C. Modèles
+    # Modèles
     print(">>> [4/6] Instanciation et Entraînement...")
     news_tower = NewsModel(vocab_ids, emb_matrix)
     user_tower = UserModel(news_tower)
@@ -220,7 +208,7 @@ def main():
     
     model.fit(train_ds, epochs=EPOCHS)
     
-    # D. Export
+    # Export
     print(">>> [5/6] Sauvegarde des Artefacts...")
     output_dir = "artifacts"
     if os.path.exists(output_dir):
@@ -228,11 +216,10 @@ def main():
     os.makedirs(f"{output_dir}/models", exist_ok=True)
     os.makedirs(f"{output_dir}/embeddings", exist_ok=True)
     
-    # 1. Index (SavedModel)
-    # C'est lui qui va contenir la grosse matrice SBERT dans ses variables
+    # Index (SavedModel)
     index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)
     
-    # On indexe tout le corpus (c'est lourd mais nécessaire pour le fichier final)
+    # On indexe tout le corpus 
     print("    Construction de l'index BruteForce (peut être long)...")
     # On passe les IDs bruts au news_model pour qu'il génère les vecteurs
     news_ids_ds = tf.data.Dataset.from_tensor_slices(vocab_ids).batch(128)
@@ -250,7 +237,7 @@ def main():
     print(f"    Sauvegarde dans {output_dir}/models/news_index ...")
     tf.saved_model.save(index, f"{output_dir}/models/news_index")
     
-    # 2. Embeddings statiques (Numpy) pour l'API
+    # Embeddings statiques (Numpy) pour l'API
     # L'API a besoin des vecteurs finaux (64 dims) pas ceux de BERT (384)
     print("    Génération des embeddings finaux (.npy)...")
     final_embeddings = []

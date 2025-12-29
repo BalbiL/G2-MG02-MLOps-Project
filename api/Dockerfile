@@ -11,7 +11,6 @@ COPY api_config.py .
 
 EXPOSE 8000
 
-# --- FIX IMPORT ---
 # Ajoute /app/api au chemin de recherche Python pour que 'import database' fonctionne
 ENV PYTHONPATH="${PYTHONPATH}:/app/api"
 

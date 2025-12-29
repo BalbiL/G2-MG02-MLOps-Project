@@ -224,7 +224,7 @@ resource "aws_ecs_task_definition" "app" {
   ])
 }
 
-# --- SERVICE ECS (Mis à jour) ---
+# --- SERVICE ECS ---
 resource "aws_ecs_service" "app_service" {
   name            = "g2-mg02-news-reco-task-service-nyvdt5tq"
   cluster         = aws_ecs_cluster.main.id
@@ -253,10 +253,10 @@ resource "aws_ecs_service" "app_service" {
 }
 
 
-# --- STOCKAGE S3 EXISTANT (Importé) ---
+# --- STOCKAGE S3  ---
 
 resource "aws_s3_bucket" "model_bucket" {
-  bucket = "s3-g2mg02"  # Votre nom de bucket exact
+  bucket = "s3-g2mg02"  
 
   # Sécurité : Empêche Terraform de supprimer ce bucket accidentellement
   lifecycle {
@@ -264,7 +264,7 @@ resource "aws_s3_bucket" "model_bucket" {
   }
 }
 
-# 1. Configuration du Versioning (Activé comme vous l'avez fait)
+# Configuration du Versioning 
 resource "aws_s3_bucket_versioning" "model_bucket_versioning" {
   bucket = aws_s3_bucket.model_bucket.id
   versioning_configuration {
@@ -272,7 +272,7 @@ resource "aws_s3_bucket_versioning" "model_bucket_versioning" {
   }
 }
 
-# 2. Configuration de l'accès public (Tout autorisé selon votre demande)
+# Configuration de l'accès public 
 resource "aws_s3_bucket_public_access_block" "model_bucket_public_access" {
   bucket = aws_s3_bucket.model_bucket.id
 
@@ -283,7 +283,7 @@ resource "aws_s3_bucket_public_access_block" "model_bucket_public_access" {
   restrict_public_buckets = false
 }
 
-# 3. La Politique de sécurité (Votre JSON exact)
+# Politique de sécurité
 resource "aws_s3_bucket_policy" "model_bucket_policy" {
   bucket = aws_s3_bucket.model_bucket.id
 

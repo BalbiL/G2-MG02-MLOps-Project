@@ -1,9 +1,7 @@
 import os
 import boto3
 
-# Configuration
-# Note: Le bucket est récupéré via les secrets ou variables d'env idéalement, 
-# sinon modifiez ici pour votre bucket de test
+# Configuration du bucket pour upload
 BUCKET_NAME = "s3-g2mg02"  
 ARTIFACTS_DIR = "artifacts"
 
@@ -20,16 +18,14 @@ def upload_artifacts():
         for file in files:
             local_path = os.path.join(root, file)
             
-            # 1. Calcul du chemin relatif (ex: models/news_index/saved_model.pb)
+            # Calcul du chemin relatif 
             relative_path = os.path.relpath(local_path, ARTIFACTS_DIR)
             s3_key = relative_path.replace("\\", "/") # Compatibilité Windows/Linux
             
-            # 2. APPLICATION DE LA RÈGLE SPÉCIFIQUE "models/models"
-            # Si le fichier est dans le dossier 'models', on ajoute le préfixe en double
+            # Si le fichier est dans le dossier 'models', on ajoute le préfixe en double (necessaire pour le chargement dans new_inference)
             if s3_key.startswith("models/"):
                 s3_key = f"models/{s3_key}"
             
-            # Les fichiers dans 'embeddings/' restent tels quels (ex: embeddings/news_embeddings.npy)
 
             print(f"Uploading: {local_path} -> s3://{BUCKET_NAME}/{s3_key}")
             try:
