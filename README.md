@@ -33,11 +33,11 @@ We also apply diversity-aware re-ranking to keep recommendations relevant while 
 | **MLOps** | MLFlow, DagsHub |
 | **Frontend** | Streamlit |
 | **Language** | Python 3.12+ |
-| **Deployment** | AWS EC2 |
+| **Deployment** | AWS ECS/ALB |
 
 
 
-## **The Team** 
+## **The Team (for the original project, not the MLOps implementation)** 
 * **Arthur DELFOSSE** (arthur.delfosse@edu.ece.fr) - Project Lead
 * **Tom BALLET** (tom.ballet@edu.ece.fr) - Data Engineer
 * **Elise BRUNETON** (elise.bruneton@edu.ece.fr) - Data Engineer
