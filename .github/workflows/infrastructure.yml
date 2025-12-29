@@ -1,0 +1,35 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches:
+      - deployment_version
+    paths:
+      - 'terraform/**' # Ne se lance que si on touche au dossier terraform
+
+jobs:
+  terraform:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    
+    # Ces variables permettent à Terraform d'accéder au backend S3 automatiquement
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: 'eu-west-3'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      # Cette étape va lire le state dans S3, comparer avec le code, et appliquer les changements
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: terraform apply -auto-approve

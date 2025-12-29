@@ -1,3 +1,22 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  # --- GESTION DU STATE TERRAFORM (BACKEND S3) ---
+  backend "s3" {
+    bucket  = "s3-g2mg02"                     
+    key     = "terraform/terraform.tfstate"   # Chemin dans le bucket
+    region  = "eu-west-3"
+    encrypt = true                            # Chiffrement côté serveur (SSE)
+  }
+}
+
+
+
 provider "aws" {
   region = "eu-west-3"
 }
