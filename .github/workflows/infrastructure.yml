@@ -32,4 +32,7 @@ jobs:
       # Cette étape va lire le state dans S3, comparer avec le code, et appliquer les changements
       - name: Terraform Apply
         working-directory: ./terraform
+        env:
+          TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+          TF_VAR_supabase_key: ${{ secrets.SUPABASE_KEY }}
         run: terraform apply -auto-approve
